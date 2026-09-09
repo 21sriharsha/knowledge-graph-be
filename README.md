@@ -95,6 +95,13 @@ systemctl --user start podman.socket
 export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
 ```
 
+## Vocabulary
+
+[docs/dictionary.md](./docs/dictionary.md) defines the words this codebase uses — slug, read model,
+neighbourhood, canonical vs derived, authored vs inferred, and the rest. Most of them are
+load-bearing: they mark a boundary, a lifecycle state, or a distinction the architecture depends on.
+Worth reading before renaming anything.
+
 ## Module layout
 
 Eleven Maven modules. Only `platform-app` produces a deployable artifact; the others exist so that a
