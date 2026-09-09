@@ -57,7 +57,7 @@ class MigrationIntegrationTest extends AbstractPostgresIntegrationTest {
                 "release-tag-v1.0.0", "schema-setup", "author-setup", "source-setup",
                 "content-setup", "ingestion-setup", "graph-setup", "search-setup",
                 "read-model-setup", "read-model-schema-version", "analytics-setup",
-                "index-setup");
+                "account-setup", "index-setup");
     }
 
     @Test

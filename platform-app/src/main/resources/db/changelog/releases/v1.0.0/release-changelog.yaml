@@ -187,6 +187,20 @@ databaseChangeLog:
               DROP TABLE IF EXISTS analytics.article_view_counts;
               DROP SCHEMA IF EXISTS analytics CASCADE;
 
+  - changeSet:
+      id: account-setup
+      author: sriharsha.c
+      labels: author identity canonical
+      changes:
+        - sqlFile:
+            path: scripts/create/author/accounts.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS author.account_roles;
+              DROP TABLE IF EXISTS author.accounts;
+
   # ── Cross-schema indexes ───────────────────────────────────────────────────
   # Runs last: indexes the foreign-key columns not already covered by a key constraint.
   - changeSet:
