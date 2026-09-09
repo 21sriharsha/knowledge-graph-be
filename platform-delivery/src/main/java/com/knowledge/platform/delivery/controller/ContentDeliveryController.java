@@ -10,12 +10,20 @@ import com.knowledge.platform.delivery.model.dto.RouteTarget;
 import com.knowledge.platform.delivery.model.dto.TagReadModel;
 import com.knowledge.platform.delivery.model.dto.TaxonomyListing;
 import com.knowledge.platform.delivery.model.dto.TopicReadModel;
+import com.knowledge.platform.delivery.model.dto.TrendingArticle;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import java.util.List;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -27,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  * frontend to render with its own components.
  */
 @RestController
+@Validated
 @Tag(name = "Delivery", description = "Read models for the public reading experience")
 public class ContentDeliveryController {
 
@@ -34,6 +43,37 @@ public class ContentDeliveryController {
 
     public ContentDeliveryController(DeliveryDelegate deliveryDelegate) {
         this.deliveryDelegate = deliveryDelegate;
+    }
+
+    @GetMapping("/api/articles/trending")
+    @Operation(summary = "The most-read articles over a window",
+            description = """
+                    Ordered by recorded views, most recent window first. Empty until something has
+                    actually been read -- there is no synthetic ordering to fall back on, and a
+                    trending list padded with unread articles would mean nothing.
+
+                    Counting is anonymous: the platform records how often an article was read and
+                    nothing about who read it.
+                    """)
+    public List<TrendingArticle> trending(
+            @RequestParam(defaultValue = "7") @Min(1) @Max(365) int days,
+            @RequestParam(defaultValue = "6") @Min(1) @Max(50) int limit) {
+        return deliveryDelegate.trending(days, limit);
+    }
+
+    @PostMapping("/api/articles/{slug}/view")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Record that an article was read",
+            description = """
+                    Accepted and buffered rather than written immediately: reading is the hottest
+                    path in the application and a row per read would make every read a write.
+
+                    Deliberately fire-and-forget. The response carries no body and the caller is not
+                    expected to care whether it succeeded -- a miscounted view is not worth a retry,
+                    and never worth delaying a page.
+                    """)
+    public void recordView(@PathVariable String slug) {
+        deliveryDelegate.recordView(slug);
     }
 
     @GetMapping("/api/articles/{slug}")

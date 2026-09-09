@@ -61,6 +61,13 @@ public class SecurityConfig {
                                 "/api/tags/**", "/api/search/**", "/api/graph/**",
                                 "/api/routes/**", "/api/navigation/**")
                         .permitAll()
+                        // Recording a read is anonymous by necessity: readers have no identity
+                        // here, and requiring one to count a page view would mean building an
+                        // identity system to populate a landing-page panel. The exposure is
+                        // understood and bounded -- the endpoint accepts no body, writes no
+                        // reader data, and the worst an abuser achieves is an inaccurate
+                        // trending list. See issue #5 for rate limiting.
+                        .requestMatchers(HttpMethod.POST, "/api/articles/*/view").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Metrics expose query patterns and traffic volumes; not public.
                         .requestMatchers("/actuator/**").hasRole("ADMIN")

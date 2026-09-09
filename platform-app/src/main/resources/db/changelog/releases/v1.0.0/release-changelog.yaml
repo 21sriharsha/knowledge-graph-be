@@ -173,6 +173,20 @@ databaseChangeLog:
         - sql:
             sql: ALTER TABLE read_model.article_read_models DROP COLUMN schema_version;
 
+  - changeSet:
+      id: analytics-setup
+      author: sriharsha.c
+      labels: analytics observed
+      changes:
+        - sqlFile:
+            path: scripts/create/analytics/article-view-counts.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS analytics.article_view_counts;
+              DROP SCHEMA IF EXISTS analytics CASCADE;
+
   # ── Cross-schema indexes ───────────────────────────────────────────────────
   # Runs last: indexes the foreign-key columns not already covered by a key constraint.
   - changeSet:

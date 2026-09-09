@@ -46,7 +46,12 @@ public class CacheConfig {
                 caffeineCache(CacheNames.ROUTE_RESOLUTIONS, properties.routeMaximumSize(),
                         properties.routeTimeToLive(), meterRegistry),
                 caffeineCache(CacheNames.NAVIGATION, 16,
-                        properties.readModelTimeToLive(), meterRegistry)));
+                        properties.readModelTimeToLive(), meterRegistry),
+                // Short-lived on purpose: this one is never invalidated. View counts change
+                // continuously and no event marks "trending changed", so freshness here is a
+                // question of how stale the list may get, not of catching an update.
+                caffeineCache(CacheNames.TRENDING_ARTICLES, 32,
+                        properties.trendingTimeToLive(), meterRegistry)));
         manager.initializeCaches();
         return manager;
     }
