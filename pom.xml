@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.1</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>com.knowledge</groupId>
+	<artifactId>knowledge-platform</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+
+	<name>knowledge-platform</name>
+	<description>Knowledge publishing and discovery platform</description>
+
+	<!--
+	  A modular monolith, not a distributed system: exactly one module (platform-app) produces a
+	  deployable artifact. The other modules exist so that a boundary violation is a compile error
+	  rather than a code-review opinion. platform-search cannot import platform-source, because its
+	  POM does not declare it, so adding a cross-module dependency is a reviewable POM diff.
+
+	  Dependency direction (acyclic, enforced by the reactor):
+
+	      common    is used by  everything
+	      jobs      is used by  source, search, ingestion
+	      ai        is used by  search, ingestion
+	      author    is used by  content, source, search, delivery, ingestion
+	      content   is used by  graph, search, delivery, ingestion
+	      graph     is used by  search, delivery, ingestion
+	      source    is used by  ingestion
+	      search    is used by  ingestion
+	      delivery  is used by  ingestion
+	      app       depends on  all of them
+	-->
+	<modules>
+		<module>platform-common</module>
+		<module>platform-jobs</module>
+		<module>platform-ai</module>
+		<module>platform-author</module>
+		<module>platform-content</module>
+		<module>platform-source</module>
+		<module>platform-graph</module>
+		<module>platform-search</module>
+		<module>platform-delivery</module>
+		<module>platform-ingestion</module>
+		<module>platform-app</module>
+	</modules>
+
+	<properties>
+		<java.version>21</java.version>
+		<spring-ai.version>2.0.1</spring-ai.version>
+		<springdoc.version>3.1.0</springdoc.version>
+		<commonmark.version>0.25.1</commonmark.version>
+		<testcontainers.version>1.21.3</testcontainers.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-common</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-jobs</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-ai</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-author</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-content</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-source</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-graph</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-search</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-delivery</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.knowledge</groupId>
+				<artifactId>platform-ingestion</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<!-- Lombok is used platform-wide for @Slf4j. Declared once here rather than in eleven POMs;
+		     `provided` because it is a compile-time annotation processor with no runtime presence. -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Every module is tested; declaring this once here keeps eleven POMs from repeating it. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<!--
+				  maven-compiler-plugin 3.13+ no longer discovers annotation processors from the
+				  compile classpath (javac deprecated implicit processing), so Lombok has to be named
+				  explicitly for @Slf4j to work. Note that declaring an explicit path replaces
+				  classpath discovery entirely rather than adding to it: a module needing another
+				  processor must list Lombok alongside it (see platform-app).
+				-->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<annotationProcessorPaths>
+							<path>
+								<groupId>org.projectlombok</groupId>
+								<artifactId>lombok</artifactId>
+								<version>${lombok.version}</version>
+							</path>
+						</annotationProcessorPaths>
+					</configuration>
+				</plugin>
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+					<configuration>
+						<!-- Library modules must stay plain jars; only platform-app is repackaged. -->
+						<skip>true</skip>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+</project>

@@ -1,0 +1,27 @@
+# Local development only. Never active in any deployed environment.
+#
+# The values here exist so a developer can clone, run docker compose, and start the application.
+# They are not secrets: the credential key below encrypts nothing that matters on a local machine,
+# and the studio password is a placeholder. Both must come from the environment anywhere real.
+
+knowledge:
+  source:
+    # A fixed development key, so credentials stored locally survive a restart. It is the literal
+    # ASCII string "local-dev-key-not-a-secret!!!!!!" base64-encoded -- deliberately recognisable, so
+    # nobody mistakes it for a real key. Anything encrypted with it should be assumed public.
+    # Generate a real one with: openssl rand -base64 32
+    credential-key: "bG9jYWwtZGV2LWtleS1ub3QtYS1zZWNyZXQhISEhISE="
+
+  security:
+    studio-users:
+      - username: author
+        password: author
+        roles: [ AUTHOR ]
+      - username: admin
+        password: admin
+        roles: [ AUTHOR, ADMIN ]
+
+logging:
+  level:
+    com.knowledge.platform: DEBUG
+    org.springframework.web: INFO
