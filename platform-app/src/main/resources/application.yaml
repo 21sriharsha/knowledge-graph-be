@@ -96,6 +96,9 @@ knowledge:
     graph-time-to-live: 30m
     route-maximum-size: 5000
     route-time-to-live: 6h
+    # Not invalidated by anything: view counts change continuously and no event marks "trending
+    # changed", so this is a staleness budget rather than a safety net.
+    trending-time-to-live: 5m
 
   search:
     candidate-limit: 100           # Over-fetch relative to page size so the ranker has a pool to reorder.

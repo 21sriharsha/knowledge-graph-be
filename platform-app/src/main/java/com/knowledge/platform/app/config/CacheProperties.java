@@ -18,11 +18,14 @@ public record CacheProperties(
         @Min(1) long graphMaximumSize,
         Duration graphTimeToLive,
         @Min(1) long routeMaximumSize,
-        Duration routeTimeToLive) {
+        Duration routeTimeToLive,
+        Duration trendingTimeToLive) {
 
     public CacheProperties {
         readModelTimeToLive = readModelTimeToLive == null ? Duration.ofHours(1) : readModelTimeToLive;
         graphTimeToLive = graphTimeToLive == null ? Duration.ofMinutes(30) : graphTimeToLive;
         routeTimeToLive = routeTimeToLive == null ? Duration.ofHours(6) : routeTimeToLive;
+        trendingTimeToLive =
+                trendingTimeToLive == null ? Duration.ofMinutes(5) : trendingTimeToLive;
     }
 }

@@ -11,8 +11,11 @@ import com.knowledge.platform.delivery.model.dto.TagReadModel;
 import com.knowledge.platform.delivery.model.dto.TaxonomyListing;
 import com.knowledge.platform.delivery.model.dto.TopicReadModel;
 import com.knowledge.platform.delivery.service.BrowseReadModelService;
+import com.knowledge.platform.delivery.model.dto.TrendingArticle;
+import com.knowledge.platform.delivery.service.ArticleViewService;
 import com.knowledge.platform.delivery.service.ReadModelService;
 import com.knowledge.platform.delivery.service.RouteResolutionService;
+import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
@@ -23,14 +26,25 @@ public class DeliveryDelegate {
     private final ReadModelService readModelService;
     private final BrowseReadModelService browseReadModelService;
     private final RouteResolutionService routeResolutionService;
+    private final ArticleViewService articleViewService;
 
     public DeliveryDelegate(
             ReadModelService readModelService,
             BrowseReadModelService browseReadModelService,
-            RouteResolutionService routeResolutionService) {
+            RouteResolutionService routeResolutionService,
+            ArticleViewService articleViewService) {
         this.readModelService = readModelService;
         this.browseReadModelService = browseReadModelService;
         this.routeResolutionService = routeResolutionService;
+        this.articleViewService = articleViewService;
+    }
+
+    public List<TrendingArticle> trending(int days, int limit) {
+        return articleViewService.trending(days, limit);
+    }
+
+    public void recordView(String slug) {
+        articleViewService.recordView(Slug.of(slug));
     }
 
     public ArticleReadModel article(String slug) {

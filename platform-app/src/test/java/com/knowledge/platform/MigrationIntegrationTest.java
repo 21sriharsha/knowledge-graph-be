@@ -56,7 +56,8 @@ class MigrationIntegrationTest extends AbstractPostgresIntegrationTest {
         assertThat(applied).containsExactly(
                 "release-tag-v1.0.0", "schema-setup", "author-setup", "source-setup",
                 "content-setup", "ingestion-setup", "graph-setup", "search-setup",
-                "read-model-setup", "read-model-schema-version", "index-setup");
+                "read-model-setup", "read-model-schema-version", "analytics-setup",
+                "index-setup");
     }
 
     @Test
