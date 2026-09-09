@@ -1,0 +1,22 @@
+# Integration test profile.
+#
+# AI is switched off deliberately. Tests must not depend on a model runtime being present, and the
+# deterministic path is the one that has to work regardless -- the AI boundary is designed so that
+# its absence degrades quality rather than behaviour, and these tests exercise exactly that state.
+knowledge:
+  ai:
+    enabled: false
+  source:
+    # 32 bytes, base64. Encrypts nothing that outlives the test container.
+    credential-key: "dGVzdC1vbmx5LWtleS1leGFjdGx5LTMyLWJ5dGVzISE="
+  security:
+    studio-users:
+      - username: test-author
+        password: test-password
+        roles: [ AUTHOR, ADMIN ]
+
+logging:
+  level:
+    liquibase: WARN
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

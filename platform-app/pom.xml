@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.knowledge</groupId>
+		<artifactId>knowledge-platform</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>platform-app</artifactId>
+	<name>platform-app</name>
+	<description>The deployable monolith: composition root, configuration and database migrations</description>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-common</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-jobs</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-ai</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-author</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-content</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-source</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-graph</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-search</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-delivery</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.knowledge</groupId>
+			<artifactId>platform-ingestion</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<!-- Spring Boot 4 makes the JSON mapper pluggable, so the web starter no longer brings
+		     Jackson in by itself. The platform depends on it directly: read models are persisted as
+		     JSON, and the source adapters parse provider webhook payloads. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jackson</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-liquibase</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- MockMvc. Spring Boot 4 moved it out of spring-boot-test-autoconfigure into its own
+		     starter, so it is no longer pulled in by spring-boot-starter-test. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<!-- Adds the configuration-processor to the shared Lombok processor path. Both must be
+			     listed: an explicit annotationProcessorPaths replaces the inherited one rather than
+			     extending it, so omitting Lombok here would silently break @Slf4j in this module. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+						<path>
+							<groupId>org.springframework.boot</groupId>
+							<artifactId>spring-boot-configuration-processor</artifactId>
+							<version>${spring-boot.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- Overrides the parent's pluginManagement skip: this is the deployable. -->
+					<skip>false</skip>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

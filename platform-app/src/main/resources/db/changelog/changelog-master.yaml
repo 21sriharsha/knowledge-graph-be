@@ -1,0 +1,11 @@
+# Master changelog. One include per release; releases are never edited once applied anywhere real.
+#
+# A release directory owns its complete DDL script set, so `db/changelog/releases/v1.0.0/` is the
+# full answer to "what does v1.0.0 create". The next release gets its own directory and its own
+# scripts rather than editing these.
+databaseChangeLog:
+  - include:
+      file: db/changelog/releases/v1.0.0/release-changelog.yaml
+
+#  - include:
+#      file: db/changelog/releases/v1.1.0/release-changelog.yaml

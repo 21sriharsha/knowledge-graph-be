@@ -1,0 +1,36 @@
+# Optional local PostgreSQL.
+#
+# The documented setup uses a system-installed PostgreSQL with pgvector on the default port — see
+# the README. This file exists for machines that do not have one.
+#
+# It therefore binds 5433, NOT 5432. Binding the default port would collide with a system PostgreSQL
+# on exactly the machines where that is already running, and the failure ("port already allocated")
+# says nothing about the cause. Point the application at it with:
+#
+#     DATABASE_URL=jdbc:postgresql://localhost:5433/knowledge ./mvnw spring-boot:run -pl platform-app
+services:
+  postgres:
+    # pgvector rather than stock postgres: the first migration creates the vector extension, so the
+    # base image fails before any table is created.
+    image: pgvector/pgvector:pg17
+    container_name: knowledge-postgres
+    environment:
+      POSTGRES_DB: knowledge
+      POSTGRES_USER: knowledge
+      POSTGRES_PASSWORD: knowledge
+    ports:
+      - "5433:5432"
+    volumes:
+      # A named volume, so content survives a restart. An anonymous volume would make every
+      # `compose down` a silent data loss.
+      - knowledge-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Liquibase fails confusingly against a database still initialising, so dependents wait on
+      # this rather than on the container merely being up.
+      test: [ "CMD-SHELL", "pg_isready -U knowledge -d knowledge" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  knowledge-postgres-data:

@@ -1,0 +1,193 @@
+databaseChangeLog:
+  # Tag placed FIRST, deliberately, while this release is still in active design: changesets are
+  # appended below on an ongoing basis, and a tag at the true end would have to move on every
+  # addition or end up stranded mid-file. Placed first it is a stable anchor for the pre-release
+  # state and never needs to move. Move it to genuinely last once the release closes out.
+  - changeSet:
+      id: release-tag-v1.0.0
+      author: sriharsha.c
+      changes:
+        - tagDatabase:
+            tag: v1.0.0
+
+  # ── Schemas ────────────────────────────────────────────────────────────────
+  # Must run first: every script below is schema-qualified.
+  - changeSet:
+      id: schema-setup
+      author: sriharsha.c
+      labels: init schemas extensions
+      changes:
+        - sqlFile:
+            path: scripts/create/schemas.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP SCHEMA IF EXISTS read_model CASCADE;
+              DROP SCHEMA IF EXISTS search CASCADE;
+              DROP SCHEMA IF EXISTS graph CASCADE;
+              DROP SCHEMA IF EXISTS ingestion CASCADE;
+              DROP SCHEMA IF EXISTS source CASCADE;
+              DROP SCHEMA IF EXISTS content CASCADE;
+              DROP SCHEMA IF EXISTS author CASCADE;
+
+  # ── Canonical schemas ──────────────────────────────────────────────────────
+  # Ordered by foreign-key dependency: authors, then source repositories (which reference an owning
+  # author), then articles (which reference both).
+  - changeSet:
+      id: author-setup
+      author: sriharsha.c
+      labels: author canonical
+      changes:
+        - sqlFile:
+            path: scripts/create/author/authors.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: DROP TABLE IF EXISTS author.authors;
+
+  - changeSet:
+      id: source-setup
+      author: sriharsha.c
+      labels: source canonical
+      changes:
+        - sqlFile:
+            path: scripts/create/source/repositories.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/source/webhook-deliveries.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS source.webhook_deliveries;
+              DROP TABLE IF EXISTS source.repositories;
+
+  - changeSet:
+      id: content-setup
+      author: sriharsha.c
+      labels: content canonical
+      changes:
+        - sqlFile:
+            path: scripts/create/content/taxonomy.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/content/articles.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/content/article-revisions.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/content/article-taxonomy.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS content.article_topics;
+              DROP TABLE IF EXISTS content.article_tags;
+              DROP TABLE IF EXISTS content.article_revisions;
+              DROP TABLE IF EXISTS content.articles;
+              DROP TABLE IF EXISTS content.tags;
+              DROP TABLE IF EXISTS content.topics;
+
+  - changeSet:
+      id: ingestion-setup
+      author: sriharsha.c
+      labels: ingestion canonical
+      changes:
+        - sqlFile:
+            path: scripts/create/ingestion/runs.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/ingestion/events.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS ingestion.events;
+              DROP TABLE IF EXISTS ingestion.runs;
+
+  # ── Derived schemas ────────────────────────────────────────────────────────
+  # Everything below is materialized from the canonical schemas above. Dropping and re-running the
+  # ingestion pipeline rebuilds it; none of it is a source of truth.
+  - changeSet:
+      id: graph-setup
+      author: sriharsha.c
+      labels: graph derived
+      changes:
+        - sqlFile:
+            path: scripts/create/graph/article-links.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/graph/suggested-relationships.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS graph.suggested_relationships;
+              DROP TABLE IF EXISTS graph.article_links;
+
+  - changeSet:
+      id: search-setup
+      author: sriharsha.c
+      labels: search derived pgvector
+      changes:
+        - sqlFile:
+            path: scripts/create/search/article-search-documents.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/search/article-embeddings.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS search.article_embeddings;
+              DROP TABLE IF EXISTS search.article_search_documents;
+
+  - changeSet:
+      id: read-model-setup
+      author: sriharsha.c
+      labels: read-model derived
+      changes:
+        - sqlFile:
+            path: scripts/create/read-model/routes.sql
+            relativeToChangelogFile: true
+        - sqlFile:
+            path: scripts/create/read-model/article-read-models.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP TABLE IF EXISTS read_model.article_read_models;
+              DROP TABLE IF EXISTS read_model.routes;
+
+  - changeSet:
+      id: read-model-schema-version
+      author: sriharsha.c
+      labels: read-model derived
+      changes:
+        - sqlFile:
+            path: scripts/alter/read-model/article-read-models-schema-version.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: ALTER TABLE read_model.article_read_models DROP COLUMN schema_version;
+
+  # ── Cross-schema indexes ───────────────────────────────────────────────────
+  # Runs last: indexes the foreign-key columns not already covered by a key constraint.
+  - changeSet:
+      id: index-setup
+      author: sriharsha.c
+      labels: indexes
+      changes:
+        - sqlFile:
+            path: scripts/create/indexes/indexes.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sql:
+            sql: >
+              DROP INDEX IF EXISTS graph.idx_suggested_target;
+              DROP INDEX IF EXISTS content.idx_article_topics_topic;
+              DROP INDEX IF EXISTS content.idx_article_tags_tag;
+              DROP INDEX IF EXISTS content.idx_articles_primary_topic;
+              DROP INDEX IF EXISTS content.idx_articles_author;

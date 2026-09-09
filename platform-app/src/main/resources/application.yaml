@@ -1,0 +1,173 @@
+# All runtime configuration lives here. There is deliberately no second location -- no
+# liquibase.properties, no datasource settings in a POM -- because two places to configure the same
+# thing guarantees the two drift apart. Environment differences are Spring profiles and property
+# overrides, never build-tool arguments.
+
+spring:
+  application:
+    name: knowledge-platform
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/knowledge}
+    username: ${DATABASE_USERNAME:knowledge}
+    password: ${DATABASE_PASSWORD:knowledge}
+    hikari:
+      # Sized against the bounded job pool plus web threads. A pool larger than the database can
+      # serve turns a load spike into connection thrash rather than throughput.
+      maximum-pool-size: ${DATABASE_POOL_SIZE:16}
+      minimum-idle: 4
+      # Hikari takes plain milliseconds here, not an ISO/Spring duration string.
+      connection-timeout: 10000
+
+  jpa:
+    open-in-view: false            # A view rendering lazy associations is exactly what read models replace.
+    hibernate:
+      ddl-auto: validate           # Liquibase owns the schema. Hibernate only checks the mapping agrees.
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  liquibase:
+    change-log: classpath:db/changelog/changelog-master.yaml
+    # Tracking tables stay in `public`. They are written before the first changeset runs, so they
+    # cannot live in a schema that a changeset creates. Every platform table is schema-qualified into
+    # its module schema, which leaves `public` holding migration bookkeeping and nothing else.
+    default-schema: public
+
+  jackson:
+    # Jackson 3. Note the version: Boot 4's JSON stack is `tools.jackson`, not `com.fasterxml`.
+    default-property-inclusion: non_null
+    deserialization:
+      # Read models are deserialized from rows written by older shapes of the model, and a new field
+      # must not make an existing stored payload unreadable.
+      fail-on-unknown-properties: false
+    datetime:
+      # Instants as ISO-8601 strings, not epoch numbers: the frontend and the OpenAPI contract both
+      # read better for it. Jackson 3 moved this out of SerializationFeature into DateTimeFeature.
+      write-dates-as-timestamps: false
+
+  threads:
+    virtual:
+      enabled: true                # Web request threads; job execution stays on the bounded pool.
+
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:llama3.2:3b}
+          # Query understanding is a classification task. Sampling temperature above zero would make
+          # the same query plan differently between requests, which is indefensible for search.
+          temperature: 0.0
+      embedding:
+        options:
+          # 768 dimensions, matching the VECTOR(768) column. Changing this model is a migration.
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never         # Error bodies come from the ApiError contract, not the container.
+    include-stacktrace: never
+
+knowledge:
+  ai:
+    # The master switch. False everywhere without a model runtime: search then uses the deterministic
+    # analyzer and no embeddings are generated, which is a supported configuration, not a degraded one.
+    enabled: ${KNOWLEDGE_AI_ENABLED:true}
+    query-understanding-timeout: 3s
+    embedding-dimensions: 768
+    max-query-length: 500
+
+  jobs:
+    core-pool-size: 4
+    max-pool-size: 8
+    queue-capacity: 500            # Finite on purpose: back-pressure must be visible, not silent heap growth.
+    scheduler-pool-size: 2
+    await-termination-seconds: 30
+
+  cache:
+    read-model-maximum-size: 2000
+    read-model-time-to-live: 1h    # A safety net. Ingestion invalidates precisely; this bounds a missed eviction.
+    graph-maximum-size: 500
+    graph-time-to-live: 30m
+    route-maximum-size: 5000
+    route-time-to-live: 6h
+
+  search:
+    candidate-limit: 100           # Over-fetch relative to page size so the ranker has a pool to reorder.
+    max-page-size: 50
+    default-page-size: 20
+    max-query-length: 500
+    # Each backfilled embedding is an inference call. Bounded per pass so draining a large backlog
+    # cannot saturate the job executor and starve ingestion.
+    embedding-batch-size: 25
+    embedding-backfill:
+      # Drains embeddings that ingestion could not produce: AI disabled at the time, the provider
+      # unreachable, or an article edited since it was last embedded. Without this, an outage during
+      # ingestion costs those articles their semantic discoverability permanently.
+      enabled: true
+      initial-delay: PT3M
+      interval: PT10M
+    ranking:
+      # Weights are configuration, not constants, so relevance tuning is a reviewable, revertible diff.
+      lexical-weight: 1.0
+      semantic-weight: 0.8
+      author-match-boost: 0.15
+      topic-match-boost: 0.10
+      tag-match-boost: 0.05
+      recency-weight: 0.10
+      recency-half-life: 540d      # Durable technical knowledge ages slowly; recency is a tiebreaker.
+
+  graph:
+    max-depth: 3
+    max-nodes: 150                 # A knowledge graph is dense; an unbounded walk is slow and unreadable.
+    max-suggestions-per-article: 10
+
+  source:
+    # Required. Generate with: openssl rand -base64 32
+    # Supply through the environment; a checked-in key is not a key.
+    credential-key: ${SOURCE_CREDENTIAL_KEY:}
+    request-timeout: 20s
+    max-file-bytes: 2097152
+    max-tree-entries: 5000
+    reconciliation:
+      # The fallback behind webhooks. Webhooks are lossy in ways this application does not control --
+      # a provider outage during a push, a hook never registered, a delivery dropped during a restart
+      # -- and every one of those is otherwise silent and permanent.
+      enabled: true
+      initial-delay: PT2M
+      # Slow on purpose: this is a safety net, and the answer is almost always "nothing changed".
+      interval: PT15M
+      # Several intervals, so one missed pass does not read as a fault.
+      stale-after: PT2H
+
+  security:
+    allowed-origins:
+      - ${FRONTEND_ORIGIN:http://localhost:3000}
+    # Supplied through the environment. With none configured, studio endpoints reject everything --
+    # which is the correct default for a service with no identity provider yet.
+    studio-users: []
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: knowledge-platform
+
+logging:
+  pattern:
+    # The ingestion correlation id, when one is on the MDC, ties a run's log lines to its stored
+    # diagnostics and job statuses.
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{ingestionCorrelationId:-}] %logger{36} - %msg%n"
+  level:
+    com.knowledge.platform: ${LOG_LEVEL:INFO}
