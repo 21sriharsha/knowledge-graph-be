@@ -148,7 +148,23 @@ knowledge:
       # Several intervals, so one missed pass does not read as a fault.
       stale-after: PT2H
 
+  accounts:
+    # Granted ADMIN on sign-in, so a fresh installation has someone able to grant roles at all.
+    # Trusts the identity provider to have verified the address -- clear this once a real
+    # administrator exists, because while it is set anyone who can obtain a token for one of these
+    # addresses becomes an administrator.
+    bootstrap-admin-emails: ${BOOTSTRAP_ADMIN_EMAILS:}
+
   security:
+    oidc:
+      # e.g. https://<project-ref>.supabase.co/auth/v1
+      # Unset disables token authentication entirely and leaves only HTTP Basic, which is the right
+      # behaviour for a local run with no identity provider.
+      issuer-uri: ${OIDC_ISSUER_URI:}
+      # Overrides discovery. Supabase publishes its keys at <issuer>/.well-known/jwks.json.
+      jwk-set-uri: ${OIDC_JWK_SET_URI:}
+      audience: ${OIDC_AUDIENCE:}
+
     allowed-origins:
       - ${FRONTEND_ORIGIN:http://localhost:3000}
     # Supplied through the environment. With none configured, studio endpoints reject everything --

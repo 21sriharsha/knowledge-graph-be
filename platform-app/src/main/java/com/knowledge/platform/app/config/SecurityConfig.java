@@ -2,6 +2,7 @@ package com.knowledge.platform.app.config;
 
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,6 +15,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -33,10 +35,29 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  *   <li><b>Studio</b> -- {@code /api/studio/**}. Requires the AUTHOR role. The path prefix <em>is</em>
  *       the boundary, so a newly added studio endpoint is protected by default rather than by
  *       somebody remembering to annotate it.
+ *   <li><b>Account administration</b> -- {@code /api/studio/accounts/**}. Requires ADMIN. Granting
+ *       roles and linking accounts to authors is a strictly narrower power than operating sources.
  *   <li><b>Webhooks</b> -- {@code /api/webhooks/**}. Anonymous at the HTTP layer, because a provider
  *       cannot present a session, and authenticated by per-repository signature inside the source
  *       module. The signature is the credential.
  * </ul>
+ *
+ * <h2>Two ways to authenticate, for two kinds of caller</h2>
+ *
+ * <p><b>Bearer tokens</b> are how people authenticate. An OIDC provider performs the sign-in --
+ * social login or email and password, with the password policy enforced there -- and this
+ * application validates the resulting token against the provider's JWKS. It is a resource server
+ * only: it never runs an authorization code flow, never holds a client secret, and never sees a
+ * password. Roles come from this platform's own records rather than from the token; see
+ * {@link AccountJwtAuthenticationConverter} for why that distinction is not optional.
+ *
+ * <p><b>HTTP Basic</b> remains for non-human callers -- a CI job, a migration script, an operator
+ * with curl. Those credentials are configured, not registered, and there is no browser flow behind
+ * them. Keeping both is also what lets the frontend migrate to tokens without a flag day.
+ *
+ * <p>Configure {@code knowledge.security.oidc.issuer-uri} to enable token authentication. With it
+ * unset the resource server is not installed at all and only Basic works, which is the correct
+ * behaviour for a local run with no identity provider.
  */
 @Slf4j
 @Configuration
@@ -45,8 +66,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain apiSecurityFilterChain(
-            HttpSecurity http, PlatformSecurityProperties properties) throws Exception {
-        return http
+            HttpSecurity http,
+            PlatformSecurityProperties properties,
+            ObjectProvider<JwtDecoder> jwtDecoder,
+            AccountJwtAuthenticationConverter accountConverter) throws Exception {
+        http
                 // The API is stateless and Basic-authenticated: there is no browser session or cookie
                 // for a CSRF token to protect, and a provider webhook could not present one anyway.
                 .csrf(AbstractHttpConfigurer::disable)
@@ -55,6 +79,9 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/webhooks/**").permitAll()
+                        // Ordered before the broader studio rule: the first match wins, so account
+                        // administration must be named first or it would settle for AUTHOR.
+                        .requestMatchers("/api/studio/accounts/**").hasRole("ADMIN")
                         .requestMatchers("/api/studio/**").hasRole("AUTHOR")
                         .requestMatchers(HttpMethod.GET,
                                 "/api/articles/**", "/api/authors/**", "/api/topics/**",
@@ -78,8 +105,20 @@ public class SecurityConfig {
                                 "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .anyRequest().authenticated())
-                .httpBasic(Customizer.withDefaults())
-                .build();
+                .httpBasic(Customizer.withDefaults());
+
+        // Installed only when an issuer is configured. Without one there is nothing to validate
+        // against, and starting a resource server that trusts nobody would fail every request in a
+        // way that looks like a bug rather than like missing configuration.
+        JwtDecoder decoder = jwtDecoder.getIfAvailable();
+        if (decoder != null) {
+            http.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
+                    .decoder(decoder)
+                    .jwtAuthenticationConverter(accountConverter)));
+        } else {
+            log.warn("No OIDC issuer configured: only HTTP Basic authentication is available.");
+        }
+        return http.build();
     }
 
     /**
