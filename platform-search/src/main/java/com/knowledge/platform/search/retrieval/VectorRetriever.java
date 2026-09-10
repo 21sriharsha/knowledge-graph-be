@@ -6,6 +6,7 @@ import com.knowledge.platform.search.model.dto.SearchPlan;
 import com.knowledge.platform.search.repository.ArticleEmbeddingRepository;
 import java.util.List;
 import java.util.Optional;
+import com.knowledge.platform.search.service.SearchProperties;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,11 +20,13 @@ import org.springframework.stereotype.Component;
 public class VectorRetriever implements Retriever {
 
     private final ArticleEmbeddingRepository embeddings;
+    private final SearchProperties properties;
     private final TextEmbeddingModel embeddingModel;
 
     public VectorRetriever(
-            ArticleEmbeddingRepository embeddings, TextEmbeddingModel embeddingModel) {
+            ArticleEmbeddingRepository embeddings, TextEmbeddingModel embeddingModel, SearchProperties properties) {
         this.embeddings = embeddings;
+        this.properties = properties;
         this.embeddingModel = embeddingModel;
     }
 
@@ -36,7 +39,8 @@ public class VectorRetriever implements Retriever {
     public List<RetrievalCandidate> retrieve(SearchPlan plan) {
         Optional<float[]> queryVector = embeddingModel.embed(plan.queryText());
         return queryVector
-                .map(vector -> embeddings.searchSimilar(vector, plan.filters(), plan.candidateLimit()))
+                .map(vector -> embeddings.searchSimilar(
+                        vector, plan.filters(), plan.candidateLimit(), properties.minimumSimilarity()))
                 .orElseGet(List::of);
     }
 
