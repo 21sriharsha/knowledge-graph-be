@@ -31,9 +31,9 @@ public class ArticleController {
     }
 
     @GetMapping
-    @Operation(summary = "List published articles")
+    @Operation(summary = "Published articles this account may edit")
     public PageResponse<ArticleResponse> list(Pageable pageable) {
-        return articleDelegate.listPublished(pageable);
+        return articleDelegate.listVisible(pageable);
     }
 
     @GetMapping("/{slug}")

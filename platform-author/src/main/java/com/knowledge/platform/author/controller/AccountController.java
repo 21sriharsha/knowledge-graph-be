@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * exist rather than the permissions arriving with the sign-in.
  */
 @RestController
-@RequestMapping("/api/studio/accounts")
+@RequestMapping("/api/studio")
 @Tag(name = "Accounts", description = "Who may sign in, and what they may do")
 public class AccountController {
 
@@ -38,7 +38,19 @@ public class AccountController {
         this.accountDelegate = accountDelegate;
     }
 
-    @GetMapping
+    @GetMapping("/me")
+    @Operation(summary = "The signed-in account, including its roles and linked byline",
+            description = """
+                    Reachable by any authenticated caller, including one with no roles at all --
+                    which is every account on its first sign-in. It is how the studio knows whether
+                    to show an empty page or an explanation, and an account that cannot ask this
+                    cannot be told why it can do nothing.
+                    """)
+    public AccountResponse me() {
+        return accountDelegate.me();
+    }
+
+    @GetMapping("/accounts")
     @Operation(summary = "Every account that has signed in",
             description = """
                     Including those with no roles. A new sign-in appears here immediately and can do
@@ -49,13 +61,13 @@ public class AccountController {
         return accountDelegate.accounts();
     }
 
-    @PutMapping("/{accountId}/roles/{role}")
+    @PutMapping("/accounts/{accountId}/roles/{role}")
     @Operation(summary = "Grant a role")
     public AccountResponse grant(@PathVariable UUID accountId, @PathVariable PlatformRole role) {
         return accountDelegate.grant(accountId, role);
     }
 
-    @DeleteMapping("/{accountId}/roles/{role}")
+    @DeleteMapping("/accounts/{accountId}/roles/{role}")
     @Operation(summary = "Revoke a role",
             description = """
                     Refuses to remove the last administrator: an installation where nobody can grant
@@ -65,7 +77,7 @@ public class AccountController {
         return accountDelegate.revoke(accountId, role);
     }
 
-    @PutMapping("/{accountId}/author")
+    @PutMapping("/accounts/{accountId}/author")
     @Operation(summary = "Link an account to the byline it writes under",
             description = """
                     Deliberately manual. An author row is created during ingestion from an unverified
@@ -79,7 +91,7 @@ public class AccountController {
         return accountDelegate.linkAuthor(accountId, request.authorId());
     }
 
-    @DeleteMapping("/{accountId}/author")
+    @DeleteMapping("/accounts/{accountId}/author")
     @Operation(summary = "Unlink an account from its byline")
     public AccountResponse unlinkAuthor(@PathVariable UUID accountId) {
         return accountDelegate.unlinkAuthor(accountId);

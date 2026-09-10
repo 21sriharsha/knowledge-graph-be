@@ -2,6 +2,7 @@ package com.knowledge.platform.content.service;
 
 import com.knowledge.platform.common.exception.DomainRuleException;
 import com.knowledge.platform.common.exception.NotFoundException;
+import com.knowledge.platform.author.model.dto.StudioPrincipal;
 import com.knowledge.platform.common.model.Slug;
 import com.knowledge.platform.common.service.SlugPolicy;
 import com.knowledge.platform.content.model.dto.ArticlePublicationChangedEvent;
@@ -84,6 +85,16 @@ public class DefaultArticleServiceImpl implements ArticleService {
     @Override
     public List<Article> findBySlugs(List<String> slugs) {
         return slugs.isEmpty() ? List.of() : articleRepository.findBySlugIn(slugs);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Article requireOwnedBySlug(Slug slug, StudioPrincipal principal) {
+        Article article = requireBySlug(slug);
+        if (!principal.canActOnBehalfOf(article.getAuthorId())) {
+            throw NotFoundException.of("Article", slug.value());
+        }
+        return article;
     }
 
     @Override

@@ -9,6 +9,7 @@ import com.knowledge.platform.source.model.entity.SourceRepository;
 import com.knowledge.platform.source.model.entity.SourceType;
 import com.knowledge.platform.author.service.AuthorService;
 import com.knowledge.platform.source.repository.SourceRepositoryRepository;
+import com.knowledge.platform.author.model.dto.StudioPrincipal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,8 +54,37 @@ public class DefaultSourceServiceImpl implements SourceService {
     }
 
     @Override
+    public Optional<SourceRepository> findById(UUID id) {
+        return repositories.findById(id);
+    }
+
+    @Override
+    public SourceRepository requireOwned(UUID id, StudioPrincipal principal) {
+        SourceRepository repository = requireById(id);
+        if (!principal.canActOnBehalfOf(repository.getOwnerAuthorId())) {
+            // Deliberately the same exception as "no such repository": a distinguishable refusal
+            // would confirm the id belongs to someone, which is the thing worth not confirming.
+            throw NotFoundException.of("Source repository", id);
+        }
+        return repository;
+    }
+
+    @Override
     public List<SourceRepository> findAll() {
         return repositories.findAll();
+    }
+
+    @Override
+    public List<SourceRepository> findVisible(StudioPrincipal principal) {
+        if (principal.isAdmin()) {
+            return repositories.findAll();
+        }
+        if (principal.authorId() == null) {
+            // Signed in, no byline: owns nothing, so sees nothing. An empty studio is the honest
+            // view for someone an administrator has not yet linked to an author.
+            return List.of();
+        }
+        return repositories.findByOwnerAuthorId(principal.authorId());
     }
 
     @Override
@@ -68,16 +98,21 @@ public class DefaultSourceServiceImpl implements SourceService {
             SourceType sourceType, String displayName, String owner, String repository,
             String project, String defaultBranch, String contentPath, String apiBaseUrl,
             String accessToken, String webhookSecret,
-            String ownerAuthorName, String ownerAuthorEmail) {
+            String ownerAuthorName, String ownerAuthorEmail, UUID explicitOwnerAuthorId) {
 
         SourceRepository connected = SourceRepository.create(
                 sourceType, displayName, owner, repository, project, defaultBranch, contentPath);
 
         // Resolve the owning author now rather than waiting for ingestion to infer one. Creating the
         // identity here is what lets a repository's articles omit author frontmatter entirely.
-        UUID ownerAuthorId = ownerAuthorName == null || ownerAuthorName.isBlank()
-                ? null
-                : authorService.findOrCreateByName(ownerAuthorName, ownerAuthorEmail).getId();
+        //
+        // An explicit id wins over a name: it is what the studio passes for the signed-in author, and
+        // resolving their byline by name instead could match a different author, or mint a second.
+        UUID ownerAuthorId = explicitOwnerAuthorId != null
+                ? explicitOwnerAuthorId
+                : ownerAuthorName == null || ownerAuthorName.isBlank()
+                        ? null
+                        : authorService.findOrCreateByName(ownerAuthorName, ownerAuthorEmail).getId();
 
         connected.updateSettings(displayName, defaultBranch, contentPath, apiBaseUrl, ownerAuthorId);
 

@@ -38,6 +38,18 @@ public record AccountResponse(
                 account.getLastSeenAt());
     }
 
+    /**
+     * What a signed-in person is told about themselves.
+     *
+     * <p>Answers the two questions a studio has to answer before it can render anything honest: may
+     * I do things here, and whose work is mine. A new account can reach this while it can reach
+     * nothing else, which is the point -- somebody who has just signed up needs to be told why the
+     * studio is empty, not left to guess.
+     */
+    public static AccountResponse selfFor(Account account) {
+        return from(account);
+    }
+
     public static List<AccountResponse> from(List<Account> accounts) {
         return accounts.stream().map(AccountResponse::from).toList();
     }

@@ -142,7 +142,7 @@ class IngestionPipelineIntegrationTest extends AbstractPostgresIntegrationTest {
 
         repositoryContents.clear();
         repository = sourceService.connect(SourceType.GITHUB, "Handbook", "acme", "handbook",
-                null, "main", "docs", null, "token", "secret", null, null);
+                null, "main", "docs", null, "token", "secret", null, null, null);
 
         stubProvider();
     }
@@ -371,7 +371,7 @@ class IngestionPipelineIntegrationTest extends AbstractPostgresIntegrationTest {
         private SourceRepository connectRepositoryFor(String authorName, String email) {
             SourceRepository connected = sourceService.connect(
                     SourceType.GITHUB, authorName + " notes", slugish(authorName), "notes",
-                    null, "main", "docs", null, "token", "secret", authorName, email);
+                    null, "main", "docs", null, "token", "secret", authorName, email, null);
             stubProvider();
             return connected;
         }

@@ -1,5 +1,6 @@
 package com.knowledge.platform.content.service;
 
+import com.knowledge.platform.author.model.dto.StudioPrincipal;
 import com.knowledge.platform.common.model.Slug;
 import com.knowledge.platform.content.model.dto.ArticleUpsertCommand;
 import com.knowledge.platform.content.model.dto.ArticleUpsertResult;
@@ -36,6 +37,15 @@ public interface ArticleService {
     Optional<Article> findById(UUID id);
 
     List<Article> findBySlugs(List<String> slugs);
+
+    /**
+     * The article, if this caller is entitled to it.
+     *
+     * <p>The ownership check is inside the lookup so that forgetting it leaves nothing to act on.
+     * A repository owned by somebody else is reported exactly as one that does not exist, because a
+     * distinguishable refusal confirms the slug is real.
+     */
+    Article requireOwnedBySlug(Slug slug, StudioPrincipal principal);
 
     Page<Article> findPublished(Pageable pageable);
 
