@@ -1,13 +1,20 @@
 package com.knowledge.platform.ai.adapter.springai;
 
-import com.knowledge.platform.ai.adapter.heuristic.HeuristicQueryUnderstandingModelImpl;
 import com.knowledge.platform.ai.model.dto.SearchIntent;
 import com.knowledge.platform.ai.service.AiProperties;
 import com.knowledge.platform.ai.service.QueryUnderstandingModel;
 import com.knowledge.platform.ai.service.SearchIntentValidator;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PreDestroy;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -33,6 +40,23 @@ import org.springframework.stereotype.Service;
  *   <li><b>Any failure returns empty</b>, and the caller falls back to deterministic retrieval. A
  *       model outage degrades relevance; it must never cause a failed search.
  * </ol>
+ *
+ * <p><b>Empty means the model did not answer, and nothing else.</b> This class used to substitute
+ * the heuristic's result on failure, which made the degradation invisible to its caller: a non-empty
+ * answer arrived either way, so search reported {@code usedQueryUnderstanding: true} for queries the
+ * model had timed out on. The field exists to tell a reader how their query was read, and it was
+ * telling them something untrue. Substituting a fallback here also put the same decision in two
+ * places; it now lives only in the caller, which is the one that knows what it will do instead.
+ *
+ * <p><b>Every call has a deadline.</b> "Falls back on failure" is only a guarantee if the failure
+ * arrives promptly: an unreachable model does not refuse a connection quickly, it hangs, and a
+ * search that hangs is worse than a search that returns lexical results. The call runs on a small
+ * dedicated pool so a wedged model occupies a bounded number of threads and nothing else --
+ * particularly not ingestion, whose executor this deliberately does not share.
+ *
+ * <p>Once that pool is saturated the next query is rejected immediately and falls back, which is the
+ * correct answer: if every thread is already waiting on a model that is not answering, the next
+ * caller has no reason to wait as well.
  */
 @Service
 @Primary
@@ -72,23 +96,29 @@ public class SpringAiQueryUnderstandingModelImpl implements QueryUnderstandingMo
 
     private final ObjectProvider<ChatModel> chatModelProvider;
     private final SearchIntentValidator validator;
-    private final QueryUnderstandingModel fallback;
     private final AiProperties properties;
     private final MeterRegistry meterRegistry;
+    private final ExecutorService inferencePool;
 
     public SpringAiQueryUnderstandingModelImpl(
             ObjectProvider<ChatModel> chatModelProvider,
             SearchIntentValidator validator,
-            HeuristicQueryUnderstandingModelImpl fallback,
             AiProperties properties,
             MeterRegistry meterRegistry) {
         // ObjectProvider rather than a direct ChatModel: the Ollama auto-configuration may be absent
         // entirely, and that must degrade to the heuristic path rather than fail context startup.
         this.chatModelProvider = chatModelProvider;
         this.validator = validator;
-        this.fallback = fallback;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        this.inferencePool = new ThreadPoolExecutor(
+                0, INFERENCE_THREADS,
+                60L, TimeUnit.SECONDS,
+                // No queue. Waiting in line for a model that is already not answering adds latency
+                // and no chance of an answer; rejection is a faster route to the same fallback.
+                new SynchronousQueue<>(),
+                Thread.ofPlatform().name("slm-", 0).daemon().factory(),
+                new ThreadPoolExecutor.AbortPolicy());
     }
 
     @Override
@@ -99,33 +129,52 @@ public class SpringAiQueryUnderstandingModelImpl implements QueryUnderstandingMo
         if (query.length() > properties.maxQueryLength()) {
             // An over-long query is a paste accident or an attempt to crowd the system prompt out of
             // the context window. Neither deserves an inference call.
-            log.debug("Query exceeds {} characters; using heuristic understanding",
+            log.debug("Query exceeds {} characters; leaving it to deterministic understanding",
                     properties.maxQueryLength());
-            return fallback.understand(query);
+            return Optional.empty();
         }
 
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         if (chatModel == null) {
-            return fallback.understand(query);
+            // No model runtime configured at all. A supported deployment, not a fault.
+            return Optional.empty();
         }
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            SearchIntent raw = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user(query)
-                    .call()
-                    .entity(SearchIntent.class);
+            SearchIntent raw = CompletableFuture
+                    .supplyAsync(() -> ChatClient.create(chatModel)
+                            .prompt()
+                            .system(SYSTEM_PROMPT)
+                            .user(query)
+                            .call()
+                            .entity(SearchIntent.class), inferencePool)
+                    .get(properties.queryUnderstandingTimeout().toMillis(), TimeUnit.MILLISECONDS);
 
             sample.stop(meterRegistry.timer("knowledge.ai.query_understanding", "outcome", "success"));
             Optional<SearchIntent> validated = validator.validate(raw, query);
             if (validated.isEmpty()) {
                 meterRegistry.counter("knowledge.ai.query_understanding.rejected").increment();
-                log.debug("Model output failed validation; falling back to heuristic understanding");
-                return fallback.understand(query);
+                log.debug("Model output failed validation; leaving it to deterministic understanding");
+                return Optional.empty();
             }
             return validated;
+        } catch (TimeoutException e) {
+            sample.stop(meterRegistry.timer("knowledge.ai.query_understanding", "outcome", "timeout"));
+            meterRegistry.counter("knowledge.ai.query_understanding.timeout").increment();
+            log.warn("Query understanding exceeded {}; using deterministic retrieval",
+                    properties.queryUnderstandingTimeout());
+            return Optional.empty();
+        } catch (RejectedExecutionException e) {
+            // Every inference thread is already waiting on the model. Answering now beats queueing.
+            sample.stop(meterRegistry.timer("knowledge.ai.query_understanding", "outcome", "rejected"));
+            meterRegistry.counter("knowledge.ai.query_understanding.rejected_busy").increment();
+            log.warn("Inference pool saturated; using deterministic retrieval");
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            sample.stop(meterRegistry.timer("knowledge.ai.query_understanding", "outcome", "failure"));
+            return Optional.empty();
         } catch (Exception e) {
             sample.stop(meterRegistry.timer("knowledge.ai.query_understanding", "outcome", "failure"));
             meterRegistry.counter("knowledge.ai.query_understanding.failed").increment();
@@ -133,7 +182,15 @@ public class SpringAiQueryUnderstandingModelImpl implements QueryUnderstandingMo
             // unavailable local model would otherwise fill the log with alarming noise.
             log.warn("Query understanding unavailable ({}); using deterministic retrieval",
                     e.getMessage());
-            return fallback.understand(query);
+            return Optional.empty();
         }
+    }
+
+    /** Small on purpose: query understanding is optional, and must never crowd out real work. */
+    private static final int INFERENCE_THREADS = 4;
+
+    @PreDestroy
+    void shutdown() {
+        inferencePool.shutdownNow();
     }
 }

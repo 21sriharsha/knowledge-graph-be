@@ -9,7 +9,16 @@ import com.knowledge.platform.author.model.entity.PlatformRole;
 import com.knowledge.platform.author.service.AccountService;
 import com.knowledge.platform.author.service.AuthorService;
 import com.knowledge.platform.common.exception.DomainRuleException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +70,38 @@ class AccountIntegrationTest extends AbstractPostgresIntegrationTest {
         Account second = accounts.resolve(ISSUER, "sub-1", "a@example.com", "A");
 
         assertThat(second.getId()).isEqualTo(first.getId());
+        assertThat(accounts.findAll()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("concurrent first sign-ins produce one account, not a failure")
+    void toleratesConcurrentFirstSignIn() throws Exception {
+        // This is what actually happened in the browser: a page render made two backend calls, both
+        // were a first sign-in for the same subject, both inserted, and the loser's constraint
+        // violation surfaced inside the authentication converter -- so Spring Security reported it
+        // as a rejected token and the reader was told their credentials were bad, moments after
+        // signing in correctly.
+        int callers = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<UUID>> results = new ArrayList<>();
+
+        for (int i = 0; i < callers; i++) {
+            results.add(pool.submit(() -> {
+                start.await();
+                return accounts.resolve(ISSUER, "sub-racing", "racer@example.com", "Racer").getId();
+            }));
+        }
+        start.countDown();
+
+        Set<UUID> ids = new HashSet<>();
+        for (Future<UUID> result : results) {
+            // Every caller must get an account rather than an exception, and the same one.
+            ids.add(result.get(20, TimeUnit.SECONDS));
+        }
+        pool.shutdown();
+
+        assertThat(ids).hasSize(1);
         assertThat(accounts.findAll()).hasSize(1);
     }
 

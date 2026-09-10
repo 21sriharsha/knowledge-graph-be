@@ -7,6 +7,7 @@ import com.knowledge.platform.source.model.entity.SourceRepository;
 import com.knowledge.platform.source.model.entity.SourceType;
 import java.util.List;
 import java.util.Optional;
+import com.knowledge.platform.author.model.dto.StudioPrincipal;
 import java.util.UUID;
 
 /**
@@ -17,9 +18,41 @@ import java.util.UUID;
  */
 public interface SourceService {
 
+    /**
+     * Unrestricted lookup, for callers acting on the platform's behalf rather than a person's --
+     * ingestion, webhook dispatch, the reconciliation scheduler.
+     *
+     * <p>Never call this from a studio path. {@link #requireOwned} is the one that asks whether the
+     * caller is allowed to see it.
+     */
     SourceRepository requireById(UUID id);
 
+    /**
+     * The repository, if this caller is entitled to it.
+     *
+     * <p>The ownership check lives inside the lookup rather than beside it, so that forgetting it
+     * leaves you with no repository to act on. A separate {@code assertOwns} call would be a step
+     * a future endpoint could omit and still compile.
+     *
+     * <p>Signals a repository owned by somebody else exactly as it signals one that does not exist.
+     * A distinguishable "forbidden" would confirm the id is real to anyone enumerating.
+     */
+    SourceRepository requireOwned(UUID id, StudioPrincipal principal);
+
+    /** Unrestricted, and absent rather than throwing when there is no such repository. */
+    Optional<SourceRepository> findById(UUID id);
+
+    /** Every repository, for platform-level callers. */
     List<SourceRepository> findAll();
+
+    /**
+     * The repositories this caller may see.
+     *
+     * <p>Filtering matters as much as refusing to mutate: a list that returns everything leaks
+     * repository names, owners and content paths to anyone with a studio login, which is most of
+     * what there is to know about someone else's setup.
+     */
+    List<SourceRepository> findVisible(StudioPrincipal principal);
 
     List<SourceRepository> findActive();
 
@@ -34,7 +67,7 @@ public interface SourceService {
             SourceType sourceType, String displayName, String owner, String repository,
             String project, String defaultBranch, String contentPath, String apiBaseUrl,
             String accessToken, String webhookSecret,
-            String ownerAuthorName, String ownerAuthorEmail);
+            String ownerAuthorName, String ownerAuthorEmail, UUID explicitOwnerAuthorId);
 
     SourceRepository update(
             UUID id, String displayName, String defaultBranch, String contentPath,

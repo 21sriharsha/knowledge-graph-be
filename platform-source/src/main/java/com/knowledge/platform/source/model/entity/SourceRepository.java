@@ -126,13 +126,21 @@ public class SourceRepository {
         }
     }
 
+    /**
+     * Applies settings, leaving anything not supplied as it was.
+     *
+     * <p>{@code ownerAuthorId} follows the same rule as the credentials: null means "unchanged",
+     * not "clear it". Overwriting unconditionally meant an author editing their own display name
+     * silently orphaned the repository -- and an unowned repository is reachable by nobody but an
+     * administrator, so it removed itself from its owner's studio.
+     */
     public void updateSettings(String displayName, String defaultBranch, String contentPath,
             String apiBaseUrl, UUID ownerAuthorId) {
-        this.displayName = Objects.requireNonNull(displayName, "displayName");
+        this.displayName = displayName == null || displayName.isBlank() ? this.displayName : displayName;
         this.defaultBranch = defaultBranch == null || defaultBranch.isBlank() ? this.defaultBranch : defaultBranch;
         this.contentPath = contentPath == null ? this.contentPath : normalizePath(contentPath);
-        this.apiBaseUrl = apiBaseUrl;
-        this.ownerAuthorId = ownerAuthorId;
+        this.apiBaseUrl = apiBaseUrl == null ? this.apiBaseUrl : apiBaseUrl;
+        this.ownerAuthorId = ownerAuthorId == null ? this.ownerAuthorId : ownerAuthorId;
     }
 
     public void recordSync(String revision) {

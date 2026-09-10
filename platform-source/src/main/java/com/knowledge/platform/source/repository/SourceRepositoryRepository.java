@@ -12,6 +12,9 @@ public interface SourceRepositoryRepository extends JpaRepository<SourceReposito
 
     List<SourceRepository> findByActiveTrue();
 
+    /** The repositories one author owns. The studio list is scoped by this. */
+    List<SourceRepository> findByOwnerAuthorId(UUID ownerAuthorId);
+
     Optional<SourceRepository> findBySourceTypeAndOwnerAndRepository(
             SourceType sourceType, String owner, String repository);
 }

@@ -184,9 +184,17 @@ management:
       application: knowledge-platform
 
 logging:
+  # Structured output is opt-in rather than the default: JSON is what a log collector wants and
+  # exactly what a human reading a terminal does not. Set LOG_FORMAT=ecs (or logstash, gelf)
+  # wherever something is collecting; leave it unset locally.
+  structured:
+    format:
+      console: ${LOG_FORMAT:}
   pattern:
-    # The ingestion correlation id, when one is on the MDC, ties a run's log lines to its stored
-    # diagnostics and job statuses.
-    console: "%d{HH:mm:ss.SSS} %-5level [%X{ingestionCorrelationId:-}] %logger{36} - %msg%n"
+    # Two ids, and they answer different questions. requestId spans one HTTP request across the
+    # frontend render and every backend call it made -- it is how a page the reader saw fail is
+    # found in here. ingestionCorrelationId spans one ingestion run, which outlives the request
+    # that triggered it and continues on a background thread.
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{requestId:-}] [%X{ingestionCorrelationId:-}] %logger{36} - %msg%n"
   level:
     com.knowledge.platform: ${LOG_LEVEL:INFO}

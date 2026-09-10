@@ -81,6 +81,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/webhooks/**").permitAll()
                         // Ordered before the broader studio rule: the first match wins, so account
                         // administration must be named first or it would settle for AUTHOR.
+                        // Before the rules below: a first sign-in has no roles at all, and an
+                        // account that cannot ask about itself cannot be shown why it can do
+                        // nothing. It exposes only the caller's own record.
+                        .requestMatchers("/api/studio/me").authenticated()
                         .requestMatchers("/api/studio/accounts/**").hasRole("ADMIN")
                         .requestMatchers("/api/studio/**").hasRole("AUTHOR")
                         .requestMatchers(HttpMethod.GET,

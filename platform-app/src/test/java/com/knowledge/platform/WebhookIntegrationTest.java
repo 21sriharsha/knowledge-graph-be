@@ -77,7 +77,7 @@ class WebhookIntegrationTest extends AbstractPostgresIntegrationTest {
                 """);
 
         repository = sourceService.connect(SourceType.GITHUB, "Handbook", "acme", "handbook",
-                null, "main", "docs", null, "token", SECRET, null, null);
+                null, "main", "docs", null, "token", SECRET, null, null, null);
 
         // Only the network-touching methods are stubbed; verification and parsing stay real.
         doReturn(Optional.of("rev-1")).when(gitHubAdapter).resolveHeadRevision(any(), anyString());
