@@ -58,7 +58,12 @@ spring:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         options:
-          model: ${OLLAMA_CHAT_MODEL:llama3.2:3b}
+          # Chosen by measuring, not by size. On this hardware llama3.2:3b answers correctly but
+          # takes ~7.4s warm, which is not a search experience; llama3.2:1b answers in ~1s but
+          # echoed the enum options back as a value and invented topics that were not in the query.
+          # qwen2.5:1.5b does both -- ~1.0s warm, and it extracts only what the reader actually
+          # typed. Small models differ far more in instruction-following than in speed.
+          model: ${OLLAMA_CHAT_MODEL:qwen2.5:1.5b}
           # Query understanding is a classification task. Sampling temperature above zero would make
           # the same query plan differently between requests, which is indefensible for search.
           temperature: 0.0
@@ -78,7 +83,10 @@ knowledge:
     # The master switch. False everywhere without a model runtime: search then uses the deterministic
     # analyzer and no embeddings are generated, which is a supported configuration, not a degraded one.
     enabled: ${KNOWLEDGE_AI_ENABLED:true}
-    query-understanding-timeout: 3s
+    # Measured at 3.9-5.3s through Spring AI with qwen2.5:1.5b on CPU: the 3s this used to be
+    # timed out on every conversational query, so the feature never once ran in production shape.
+    # A first-time conversational query pays this; repeats are cached and free.
+    query-understanding-timeout: ${AI_UNDERSTANDING_TIMEOUT:8s}
     embedding-dimensions: 768
     max-query-length: 500
 

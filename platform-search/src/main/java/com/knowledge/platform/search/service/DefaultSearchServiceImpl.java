@@ -213,7 +213,12 @@ public class DefaultSearchServiceImpl implements SearchService {
                 intent.author(),
                 intent.topics(),
                 intent.tags(),
-                !plan.filters().authorIds().isEmpty());
+                !plan.filters().authorIds().isEmpty(),
+                // From the plan, not the intent: these are the dates actually filtered on, which is
+                // the point. A range the model invented and the planner discarded must not be
+                // reported as if it had been applied.
+                plan.filters().publishedAfter(),
+                plan.filters().publishedBefore());
     }
 
     private long elapsedMillis(long startedAt) {
