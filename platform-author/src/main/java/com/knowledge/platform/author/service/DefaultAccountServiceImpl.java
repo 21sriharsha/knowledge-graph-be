@@ -39,15 +39,34 @@ public class DefaultAccountServiceImpl implements AccountService {
     @Transactional
     public Account resolve(String issuer, String subject, String email, String displayName) {
         Account account = accounts.findByIssuerAndSubject(issuer, subject)
-                .orElseGet(() -> {
-                    log.info("First sign-in for subject {} at {}; creating an account with no roles",
-                            subject, issuer);
-                    return accounts.save(Account.of(issuer, subject, email, displayName));
-                });
+                .orElseGet(() -> register(issuer, subject, email, displayName));
 
         account.refreshFromToken(email, displayName);
         applyBootstrapAdmin(account);
         return accounts.save(account);
+    }
+
+    /**
+     * Creates the account for a first sign-in, tolerating another request doing the same thing.
+     *
+     * <p>The insert is conditional in the database and the row is then read back, so the request
+     * that loses the race gets the winner's account instead of a constraint violation. This ran as
+     * check-then-act and the race was not theoretical: a page that makes two backend calls triggers
+     * it on every genuine first sign-in, and the failure surfaced as "your credentials were
+     * rejected" to someone who had just signed in correctly.
+     */
+    private Account register(String issuer, String subject, String email, String displayName) {
+        int inserted = accounts.insertIfAbsent(
+                UUID.randomUUID(), issuer, subject, email, displayName);
+        if (inserted > 0) {
+            log.info("First sign-in for subject {} at {}; created an account with no roles",
+                    subject, issuer);
+        } else {
+            log.debug("Concurrent first sign-in for subject {}; using the account that won", subject);
+        }
+        return accounts.findByIssuerAndSubject(issuer, subject)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Account for " + subject + " neither existed nor could be created"));
     }
 
     /**
