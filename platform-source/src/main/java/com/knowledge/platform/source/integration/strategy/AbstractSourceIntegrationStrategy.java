@@ -4,6 +4,7 @@ import com.knowledge.platform.source.integration.adapter.SourceAdapter;
 import com.knowledge.platform.source.model.dto.PushNotification;
 import com.knowledge.platform.source.model.dto.RemoteEntry;
 import com.knowledge.platform.source.model.dto.RepositoryDescriptor;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
 import com.knowledge.platform.source.model.dto.SourceFile;
 import com.knowledge.platform.source.model.dto.WebhookOutcome;
 import com.knowledge.platform.source.model.dto.WebhookRequest;
@@ -56,6 +57,15 @@ public abstract class AbstractSourceIntegrationStrategy implements SourceIntegra
             return Optional.empty();
         }
         return adapter.readFile(descriptorFor(repository), path, revision);
+    }
+
+    @Override
+    public Optional<BinaryAsset> readAsset(
+            SourceRepository repository, String path, String revision) {
+        // Deliberately no coversPath check: an image referenced from docs/ commonly lives in
+        // assets/ or images/ beside it, and the content path bounds where prose is looked for, not
+        // where a picture may sit.
+        return adapter.readBinary(descriptorFor(repository), path, revision);
     }
 
     /**

@@ -8,6 +8,7 @@ import com.knowledge.platform.content.markdown.DocumentConverter;
 import com.knowledge.platform.content.markdown.MarkdownParser;
 import com.knowledge.platform.content.model.dto.CanonicalDocument;
 import com.knowledge.platform.content.model.dto.ContentBlock;
+import com.knowledge.platform.content.model.entity.Article;
 import com.knowledge.platform.content.model.dto.InlineContent;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +42,7 @@ class InternalLinkResolutionVisitorTest {
         CanonicalDocument document = factory.create("See [[Deployment]] and [[Missing Page]].");
 
         List<ContentBlock> patched = InternalLinkResolutionVisitor.applyTo(
-                document.blocks(), Map.of("deployment", true, "missing-page", false));
+                document.blocks(), Map.of("deployment", true, "missing-page", false), articleWithoutRepository());
 
         assertThat(internalLinks(patched))
                 .extracting(InlineContent.InternalLink::targetSlug,
@@ -68,7 +69,7 @@ class InternalLinkResolutionVisitorTest {
                 """);
 
         List<ContentBlock> patched = InternalLinkResolutionVisitor.applyTo(
-                document.blocks(), Map.of("deployment", true));
+                document.blocks(), Map.of("deployment", true), articleWithoutRepository());
 
         List<InlineContent.InternalLink> links = internalLinks(patched);
         assertThat(links).hasSize(5);
@@ -81,7 +82,7 @@ class InternalLinkResolutionVisitorTest {
         CanonicalDocument document = factory.create("See [[Deployment]].");
 
         List<ContentBlock> patched =
-                InternalLinkResolutionVisitor.applyTo(document.blocks(), Map.of());
+                InternalLinkResolutionVisitor.applyTo(document.blocks(), Map.of(), articleWithoutRepository());
 
         assertThat(internalLinks(patched)).singleElement()
                 .extracting(InlineContent.InternalLink::resolved).isEqualTo(false);
@@ -93,7 +94,7 @@ class InternalLinkResolutionVisitorTest {
         CanonicalDocument document = factory.create("```java\nint x = 1;\n```\n\n---\n");
 
         List<ContentBlock> patched =
-                InternalLinkResolutionVisitor.applyTo(document.blocks(), Map.of());
+                InternalLinkResolutionVisitor.applyTo(document.blocks(), Map.of(), articleWithoutRepository());
 
         assertThat(patched).hasSize(2);
         assertThat(patched.get(0)).isInstanceOf(ContentBlock.CodeBlock.class);
@@ -134,5 +135,17 @@ class InternalLinkResolutionVisitorTest {
                 default -> { }
             }
         }
+    }
+
+    /**
+     * These tests are about link resolution, not images.
+     *
+     * <p>An article with no repository resolves every relative image to null, which keeps image
+     * handling out of what they assert while still exercising the same walk.
+     */
+    private static Article articleWithoutRepository() {
+        Article article = org.mockito.Mockito.mock(Article.class);
+        org.mockito.Mockito.when(article.getRepositoryId()).thenReturn(null);
+        return article;
     }
 }

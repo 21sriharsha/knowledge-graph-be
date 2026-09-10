@@ -79,7 +79,7 @@ public class ArticleReadModelAssembler {
                 article.getSlug(),
                 article.getTitle(),
                 article.getSummary(),
-                InternalLinkResolutionVisitor.applyTo(document.blocks(), resolutionBySlug),
+                InternalLinkResolutionVisitor.applyTo(document.blocks(), resolutionBySlug, article),
                 document.outline(),
                 authorModel(author),
                 article.getTopics().stream()

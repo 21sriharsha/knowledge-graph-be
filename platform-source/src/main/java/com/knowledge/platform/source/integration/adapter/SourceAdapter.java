@@ -1,6 +1,7 @@
 package com.knowledge.platform.source.integration.adapter;
 
 import com.knowledge.platform.source.model.dto.PushNotification;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
 import com.knowledge.platform.source.model.dto.RemoteEntry;
 import com.knowledge.platform.source.model.dto.RepositoryDescriptor;
 import com.knowledge.platform.source.model.dto.SourceFile;
@@ -38,6 +39,19 @@ public interface SourceAdapter {
 
     /** Reads one file, decoded to UTF-8. Empty when the path does not exist at that revision. */
     Optional<SourceFile> readFile(RepositoryDescriptor descriptor, String path, String revision);
+
+    /**
+     * Reads a file as bytes, for assets an article references.
+     *
+     * <p>Separate from {@link #readFile} because that one decodes to a String, which silently
+     * corrupts anything that is not text. Providers also serve binary content through different
+     * endpoints and media types than they serve source through, which is exactly the sort of
+     * difference an adapter exists to absorb.
+     *
+     * <p>Returns empty when the file does not exist. Access control is the provider's: a token that
+     * cannot read the repository gets nothing, which is the correct answer.
+     */
+    Optional<BinaryAsset> readBinary(RepositoryDescriptor descriptor, String path, String revision);
 
     /** Resolves a branch to its current head revision. */
     Optional<String> resolveHeadRevision(RepositoryDescriptor descriptor, String branch);

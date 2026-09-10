@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
+import org.springframework.http.MediaType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -231,8 +233,31 @@ public class AzureDevOpsSourceAdapterImpl extends AbstractRestSourceAdapter {
         return path != null && path.startsWith("/") ? path.substring(1) : path;
     }
 
-    private boolean isNotFound(SourceAdapterException e) {
-        return e.getCause() instanceof HttpClientErrorException clientError
-                && clientError.getStatusCode() == HttpStatus.NOT_FOUND;
+    /**
+     * Reads bytes through the items API in octet-stream form.
+     *
+     * <p>Azure DevOps returns file content inline as text when asked for JSON, which corrupts
+     * anything that is not text. {@code $format=octetStream} is the form that returns the file
+     * itself.
+     */
+    @Override
+    public Optional<BinaryAsset> readBinary(
+            RepositoryDescriptor descriptor, String path, String revision) {
+        return fetchBinary(SourceType.AZURE_DEVOPS, "Azure DevOps asset read", path, () ->
+                client(descriptor)
+                        .get()
+                        .uri(builder -> builder
+                                .path("/{owner}/{project}/_apis/git/repositories/{repo}/items")
+                                .queryParam("path", "/" + stripLeadingSlash(path))
+                                .queryParam("$format", "octetStream")
+                                .queryParam("versionDescriptor.version", revision)
+                                .queryParam("versionDescriptor.versionType", "commit")
+                                .queryParam("api-version", API_VERSION)
+                                .build(descriptor.owner(), descriptor.project(),
+                                        descriptor.repository()))
+                        .accept(MediaType.ALL)
+                        .retrieve()
+                        .toEntity(byte[].class));
     }
+
 }

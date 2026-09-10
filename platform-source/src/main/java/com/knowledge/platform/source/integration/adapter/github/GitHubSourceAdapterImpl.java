@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
+import org.springframework.http.MediaType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -240,8 +242,31 @@ public class GitHubSourceAdapterImpl extends AbstractRestSourceAdapter {
         }
     }
 
-    private boolean isNotFound(SourceAdapterException e) {
-        return e.getCause() instanceof HttpClientErrorException clientError
-                && clientError.getStatusCode() == HttpStatus.NOT_FOUND;
+    /**
+     * Reads bytes through the contents API with GitHub's raw media type.
+     *
+     * <p>The same endpoint as {@link #readFile}, asked for differently: {@code .raw} returns the
+     * file itself instead of a JSON envelope with base64 inside. That matters for a private
+     * repository, where {@code raw.githubusercontent.com} would refuse an unauthenticated browser
+     * -- this call carries the stored token, which is the whole reason the platform proxies assets
+     * rather than pointing readers at the provider.
+     */
+    @Override
+    public Optional<BinaryAsset> readBinary(
+            RepositoryDescriptor descriptor, String path, String revision) {
+        return fetchBinary(SourceType.GITHUB, "GitHub asset read", path, () ->
+                client(descriptor)
+                        .get()
+                        .uri("/repos/{owner}/{repo}/contents/{path}?ref={ref}",
+                                descriptor.owner(), descriptor.repository(), path, revision)
+                        // headers(set), not accept()/header(): both of those *append*, and the
+                        // client already sets a default Accept -- the two combined into
+                        // "application/vnd.github.raw,*/*", which GitHub echoed back as a
+                        // Content-Type Spring then refused to parse.
+                        .headers(headers -> headers.set(
+                                HttpHeaders.ACCEPT, "application/vnd.github.raw"))
+                        .retrieve()
+                        .toEntity(byte[].class));
     }
+
 }

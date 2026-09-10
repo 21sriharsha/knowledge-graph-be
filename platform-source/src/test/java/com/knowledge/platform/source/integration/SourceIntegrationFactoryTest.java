@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.knowledge.platform.source.integration.strategy.SourceIntegrationStrategy;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
 import com.knowledge.platform.source.model.dto.SourceFile;
 import com.knowledge.platform.source.model.dto.WebhookOutcome;
 import com.knowledge.platform.source.model.dto.WebhookRequest;
@@ -67,6 +68,12 @@ class SourceIntegrationFactoryTest {
 
             @Override
             public Optional<String> resolveCurrentRevision(SourceRepository repository) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<BinaryAsset> readAsset(
+                    SourceRepository repository, String path, String revision) {
                 return Optional.empty();
             }
 

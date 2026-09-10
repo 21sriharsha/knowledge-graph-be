@@ -51,6 +51,11 @@ public class CacheConfig {
                 // continuously and no event marks "trending changed", so freshness here is a
                 // question of how stale the list may get, not of catching an update.
                 caffeineCache(CacheNames.TRENDING_ARTICLES, 32,
+                        properties.trendingTimeToLive(), meterRegistry),
+                // Bounded by entry count, not bytes, which is the wrong unit for images -- 200
+                // large ones would be a lot of heap. Kept small for that reason; the real caching
+                // happens in the browser, which is what the response's cache headers are for.
+                caffeineCache(CacheNames.REPOSITORY_ASSETS, 200,
                         properties.trendingTimeToLive(), meterRegistry)));
         manager.initializeCaches();
         return manager;

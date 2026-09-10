@@ -21,6 +21,9 @@ public final class CacheNames {
     public static final String ROUTE_RESOLUTIONS = "routeResolutions";
     public static final String NAVIGATION = "navigation";
 
+    /** Proxied repository images, keyed by repository and path. */
+    public static final String REPOSITORY_ASSETS = "repositoryAssets";
+
     /** The landing page's trending list, keyed by window and size. */
     public static final String TRENDING_ARTICLES = "trendingArticles";
 

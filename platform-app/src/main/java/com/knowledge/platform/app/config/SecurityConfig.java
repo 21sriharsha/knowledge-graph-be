@@ -90,6 +90,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/articles/**", "/api/authors/**", "/api/topics/**",
                                 "/api/tags/**", "/api/search/**", "/api/graph/**",
+                                // Images an article references. Public because the articles are.
+                                "/api/assets/**",
                                 "/api/routes/**", "/api/navigation/**")
                         .permitAll()
                         // Recording a read is anonymous by necessity: readers have no identity

@@ -1,5 +1,6 @@
 package com.knowledge.platform.source.integration.strategy;
 
+import com.knowledge.platform.source.model.dto.BinaryAsset;
 import com.knowledge.platform.source.model.dto.SourceFile;
 import com.knowledge.platform.source.model.dto.WebhookOutcome;
 import com.knowledge.platform.source.model.dto.WebhookRequest;
@@ -51,6 +52,16 @@ public interface SourceIntegrationStrategy {
 
     /** One file, or empty when it does not exist at that revision -- which is how a delete looks. */
     Optional<SourceFile> fetchFile(SourceRepository repository, String path, String revision);
+
+    /**
+     * Fetches a non-text file an article references, as bytes.
+     *
+     * <p>Not restricted to the configured content path, unlike {@link #fetchFile}. Authors keep
+     * images in a sibling directory as often as beside the prose, and refusing those would make the
+     * feature useless for the common layout. What the caller must still enforce is the type: this
+     * reaches any file in the repository, and only images are ever served.
+     */
+    Optional<BinaryAsset> readAsset(SourceRepository repository, String path, String revision);
 
     /** Verifies an inbound webhook and normalizes it. Never throws on an untrusted payload. */
     WebhookOutcome interpretWebhook(SourceRepository repository, WebhookRequest request);

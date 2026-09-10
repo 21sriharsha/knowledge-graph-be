@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import com.knowledge.platform.source.model.dto.BinaryAsset;
+import org.springframework.http.MediaType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -219,8 +221,25 @@ public class GitLabSourceAdapterImpl extends AbstractRestSourceAdapter {
         }
     }
 
-    private boolean isNotFound(SourceAdapterException e) {
-        return e.getCause() instanceof HttpClientErrorException clientError
-                && clientError.getStatusCode() == HttpStatus.NOT_FOUND;
+    /**
+     * Reads bytes through GitLab's raw file endpoint.
+     *
+     * <p>{@code /raw} rather than the JSON files endpoint: the latter base64-encodes into a field
+     * this adapter would then have to decode, and the raw form is what the provider offers for
+     * exactly this. The private token header travels with it, so a private project serves assets
+     * the same way a public one does.
+     */
+    @Override
+    public Optional<BinaryAsset> readBinary(
+            RepositoryDescriptor descriptor, String path, String revision) {
+        return fetchBinary(SourceType.GITLAB, "GitLab asset read", path, () ->
+                client(descriptor)
+                        .get()
+                        .uri("/api/v4/projects/{id}/repository/files/{path}/raw?ref={ref}",
+                                projectId(descriptor), path, revision)
+                        .accept(MediaType.ALL)
+                        .retrieve()
+                        .toEntity(byte[].class));
     }
+
 }
