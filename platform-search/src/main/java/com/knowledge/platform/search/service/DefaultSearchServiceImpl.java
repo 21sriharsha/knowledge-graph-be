@@ -142,9 +142,16 @@ public class DefaultSearchServiceImpl implements SearchService {
 
         Optional<SearchIntent> interpreted = queryUnderstandingModel.understand(query);
         if (interpreted.isEmpty()) {
+            // The model was asked and did not answer -- unavailable, too slow, or its output failed
+            // validation. Deterministic parsing rather than a literal intent, so the explicit
+            // filters a reader typed still work when the model is down; and usedModel stays false,
+            // because reporting otherwise would tell them their query was interpreted when it was
+            // not.
             meterRegistry.counter("knowledge.search.understanding", "path", "unavailable").increment();
-            log.debug("Query understanding produced nothing for '{}'; using literal retrieval", query);
-            return new Understanding(SearchIntent.literal(query), false);
+            log.debug("Query understanding produced nothing for '{}'; using deterministic parsing", query);
+            return new Understanding(
+                    deterministicModel.understand(query).orElseGet(() -> SearchIntent.literal(query)),
+                    false);
         }
         meterRegistry.counter("knowledge.search.understanding", "path", "model").increment();
         return new Understanding(interpreted.get(), true);
