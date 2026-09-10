@@ -51,7 +51,7 @@ class DefaultEmbeddingBackfillServiceImplTest {
     void setUp() {
         service = new DefaultEmbeddingBackfillServiceImpl(
                 embeddings, searchIndexService, articleService, embeddingModel,
-                new SearchProperties(100, 50, 20, 500, 25));
+                new SearchProperties(100, 50, 20, 500, 25, 0.45));
         when(embeddingModel.isAvailable()).thenReturn(true);
     }
 

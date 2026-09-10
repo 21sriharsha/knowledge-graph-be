@@ -55,7 +55,7 @@ class SearchPlannerTest {
     void setUp() {
         planner = new DefaultSearchPlannerImpl(authorService, embeddingModel,
                 topicRepository, tagRepository,
-                new SearchProperties(100, 50, 20, 500, 25));
+                new SearchProperties(100, 50, 20, 500, 25, 0.45));
         // Nothing in the corpus by default. Only model-inferred taxonomy is checked against it, so
         // the deterministic tests below are unaffected -- which is the distinction worth asserting.
         lenient().when(topicRepository.findBySlugIn(any())).thenReturn(List.of());

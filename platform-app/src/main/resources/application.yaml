@@ -89,6 +89,11 @@ knowledge:
     query-understanding-timeout: ${AI_UNDERSTANDING_TIMEOUT:8s}
     embedding-dimensions: 768
     max-query-length: 500
+    # Below this cosine similarity a vector hit is not a match, it is just the nearest thing in the
+    # corpus. Measured here: gibberish tops out at 0.40 with every document within 0.01 of it, a
+    # real query reaches 0.69. Without a floor, semantic search can never return nothing, so a
+    # query that genuinely matches nothing gets confident results instead of an explanation.
+    minimum-similarity: ${SEARCH_MIN_SIMILARITY:0.45}
 
   jobs:
     core-pool-size: 4
@@ -113,6 +118,11 @@ knowledge:
     max-page-size: 50
     default-page-size: 20
     max-query-length: 500
+    # Below this cosine similarity a vector hit is not a match, it is just the nearest thing in the
+    # corpus. Measured here: gibberish tops out at 0.40 with every document within 0.01 of it, a
+    # real query reaches 0.69. Without a floor, semantic search can never return nothing, so a
+    # query that genuinely matches nothing gets confident results instead of an explanation.
+    minimum-similarity: ${SEARCH_MIN_SIMILARITY:0.45}
     # Each backfilled embedding is an inference call. Bounded per pass so draining a large backlog
     # cannot saturate the job executor and starve ingestion.
     embedding-batch-size: 25

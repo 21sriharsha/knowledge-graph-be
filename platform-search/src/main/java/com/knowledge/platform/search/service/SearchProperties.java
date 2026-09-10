@@ -18,7 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "knowledge.search")
 public record SearchProperties(
         int candidateLimit, int maxPageSize, int defaultPageSize, int maxQueryLength,
-        int embeddingBatchSize) {
+        int embeddingBatchSize, double minimumSimilarity) {
 
     public SearchProperties {
         candidateLimit = candidateLimit <= 0 ? 100 : candidateLimit;
@@ -26,5 +26,6 @@ public record SearchProperties(
         defaultPageSize = defaultPageSize <= 0 ? 20 : defaultPageSize;
         maxQueryLength = maxQueryLength <= 0 ? 500 : maxQueryLength;
         embeddingBatchSize = embeddingBatchSize <= 0 ? 25 : embeddingBatchSize;
+        minimumSimilarity = minimumSimilarity <= 0 ? 0.45 : minimumSimilarity;
     }
 }

@@ -94,17 +94,25 @@ public class ArticleEmbeddingRepository {
      * PostgreSQL use the HNSW index. Ordering by {@code 1 - (embedding <=> ?)} descending would be
      * logically identical and would silently fall back to a sequential scan over every vector.
      */
-    public List<RetrievalCandidate> searchSimilar(float[] queryVector, SearchFilters filters, int limit) {
+    public List<RetrievalCandidate> searchSimilar(
+            float[] queryVector, SearchFilters filters, int limit, double minimumSimilarity) {
+        // Cosine similarity ranks everything, so without a floor the nearest neighbour of gibberish
+        // is still returned as a result. Measured on this corpus: "zzzznothing" tops out at 0.402
+        // and every document sits within 0.01 of that, while "kubernetes networking" reaches 0.693.
+        // A query that matches nothing has to be able to say so.
         StringBuilder sql = new StringBuilder("""
                 select e.article_id,
                        1 - (e.embedding <=> cast(? as vector)) as similarity
                   from search.article_embeddings e
                   join content.articles a on a.id = e.article_id
                  where a.publication_state = 'PUBLISHED'
+                   and 1 - (e.embedding <=> cast(? as vector)) >= ?
                 """);
 
         List<Object> arguments = new ArrayList<>();
         arguments.add(toVectorLiteral(queryVector));
+        arguments.add(toVectorLiteral(queryVector));
+        arguments.add(minimumSimilarity);
         filterSupport.appendFilters(sql, arguments, filters);
         sql.append(" order by e.embedding <=> cast(? as vector) limit ?");
         arguments.add(toVectorLiteral(queryVector));
