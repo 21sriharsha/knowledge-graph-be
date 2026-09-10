@@ -83,9 +83,21 @@ knowledge:
     # The master switch. False everywhere without a model runtime: search then uses the deterministic
     # analyzer and no embeddings are generated, which is a supported configuration, not a degraded one.
     enabled: ${KNOWLEDGE_AI_ENABLED:true}
-    # Measured at 3.9-5.3s through Spring AI with qwen2.5:1.5b on CPU: the 3s this used to be
-    # timed out on every conversational query, so the feature never once ran in production shape.
-    # A first-time conversational query pays this; repeats are cached and free.
+    # A timeout must sit outside the latency distribution, not inside it. Interpretation costs
+    # 3.9-5.3s here, and a timeout is not free: a query that exceeds it waits the whole budget and
+    # then runs deterministic retrieval anyway, paying the timeout plus the fallback.
+    #
+    # Measured over six conversational queries:
+    #
+    #   2s -> interpreted 0/6, mean 1876ms   (the feature is effectively off, and fast)
+    #   5s -> interpreted 2/6, mean ~5000ms  (strictly worse than 8s on both counts)
+    #   8s -> interpreted 6/6, mean 4628ms
+    #
+    # So 5s is dominated: fewer interpretations and a higher mean than the longer budget. The real
+    # choice is 8s or roughly 2s -- pay for the better answer, or do not pay at all. Anything in
+    # between buys the wait without the answer.
+    #
+    # First-time cost only; interpretations are cached, so a repeat is ~70ms.
     query-understanding-timeout: ${AI_UNDERSTANDING_TIMEOUT:8s}
     embedding-dimensions: 768
     max-query-length: 500
