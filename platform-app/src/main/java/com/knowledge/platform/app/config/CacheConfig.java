@@ -56,7 +56,12 @@ public class CacheConfig {
                 // large ones would be a lot of heap. Kept small for that reason; the real caching
                 // happens in the browser, which is what the response's cache headers are for.
                 caffeineCache(CacheNames.REPOSITORY_ASSETS, 200,
-                        properties.trendingTimeToLive(), meterRegistry)));
+                        properties.trendingTimeToLive(), meterRegistry),
+                // Long-lived: an interpretation depends on the query and the model, neither of
+                // which changes between requests. The only reason to expire it at all is to bound
+                // memory and to let a model upgrade take effect without a restart.
+                caffeineCache(CacheNames.QUERY_INTERPRETATIONS, 2000,
+                        properties.readModelTimeToLive(), meterRegistry)));
         manager.initializeCaches();
         return manager;
     }

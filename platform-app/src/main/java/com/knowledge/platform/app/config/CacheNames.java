@@ -21,6 +21,9 @@ public final class CacheNames {
     public static final String ROUTE_RESOLUTIONS = "routeResolutions";
     public static final String NAVIGATION = "navigation";
 
+    /** Model interpretations of a query, keyed by the query text. */
+    public static final String QUERY_INTERPRETATIONS = "queryInterpretations";
+
     /** Proxied repository images, keyed by repository and path. */
     public static final String REPOSITORY_ASSETS = "repositoryAssets";
 

@@ -32,7 +32,9 @@ public record SearchResponse(
             String author,
             List<String> topics,
             List<String> tags,
-            boolean authorResolved) {
+            boolean authorResolved,
+            java.time.Instant publishedAfter,
+            java.time.Instant publishedBefore) {
 
         public Interpretation {
             topics = topics == null ? List.of() : List.copyOf(topics);
