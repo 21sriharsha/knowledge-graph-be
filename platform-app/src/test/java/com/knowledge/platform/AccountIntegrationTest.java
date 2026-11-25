@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
@@ -34,6 +35,8 @@ import org.springframework.test.context.TestPropertySource;
  * installation cannot lock out its own administrators.
  */
 @TestPropertySource(properties = "knowledge.accounts.bootstrap-admin-emails=founder@example.com")
+@EnabledIf(value = "com.knowledge.platform.AbstractPostgresIntegrationTest#containerRuntimeAvailable",
+        disabledReason = "No container runtime; set DOCKER_HOST for rootless Podman")
 class AccountIntegrationTest extends AbstractPostgresIntegrationTest {
 
     private static final String ISSUER = "https://project.supabase.co/auth/v1";

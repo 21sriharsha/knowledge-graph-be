@@ -21,6 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -35,6 +36,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * refusal confirms that an id or slug belongs to somebody, which is most of what an attacker
  * enumerating would want to learn.
  */
+@EnabledIf(value = "com.knowledge.platform.AbstractPostgresIntegrationTest#containerRuntimeAvailable",
+        disabledReason = "No container runtime; set DOCKER_HOST for rootless Podman")
 class OwnershipIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired

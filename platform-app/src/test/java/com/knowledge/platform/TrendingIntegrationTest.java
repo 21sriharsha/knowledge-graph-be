@@ -17,6 +17,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +29,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * rather than overwrite, the window must actually exclude what is outside it, and an unread platform
  * must say so instead of inventing an order.
  */
+@EnabledIf(value = "com.knowledge.platform.AbstractPostgresIntegrationTest#containerRuntimeAvailable",
+        disabledReason = "No container runtime; set DOCKER_HOST for rootless Podman")
 class TrendingIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
