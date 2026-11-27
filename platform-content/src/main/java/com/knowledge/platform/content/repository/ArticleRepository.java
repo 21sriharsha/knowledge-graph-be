@@ -45,6 +45,14 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     Page<Article> findByAuthorIdAndPublicationStateOrderByPublishedAtDesc(
             UUID authorId, PublicationState publicationState, Pageable pageable);
 
+    /** Every article in any publication state: the administrator's editorial list. */
+    @EntityGraph(attributePaths = {"tags", "topics"})
+    Page<Article> findAllBy(Pageable pageable);
+
+    /** One byline's articles in any publication state: an author's editorial list. */
+    @EntityGraph(attributePaths = {"tags", "topics"})
+    Page<Article> findByAuthorId(UUID authorId, Pageable pageable);
+
     List<Article> findByRepositoryId(UUID repositoryId);
 
     List<Article> findBySlugIn(Collection<String> slugs);

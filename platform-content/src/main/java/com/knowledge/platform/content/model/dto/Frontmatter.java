@@ -27,16 +27,23 @@ public record Frontmatter(Map<String, List<String>> values) {
         return new Frontmatter(Map.of());
     }
 
-    /** The first value for a key, or empty when absent or blank. */
+    /**
+     * The first value for a scalar key, or empty when absent or blank.
+     *
+     * <p>Read verbatim: commas are part of the value. Splitting belongs to {@link #all} only -- a
+     * summary like "Lexical and semantic retrieval, and why scores need normalising" or a title like
+     * "Raft, explained" must not be cut at the comma.
+     */
     public Optional<String> first(String key) {
-        return all(key).stream().filter(value -> !value.isBlank()).map(String::trim).findFirst();
+        return lookup(key).stream().filter(value -> !value.isBlank()).map(String::trim).findFirst();
     }
 
     /**
-     * Every value for a key.
+     * Every value for a list key.
      *
      * <p>Handles both YAML list form and the comma-separated single-line form authors habitually
-     * write ({@code tags: postgres, indexing}), because both are common in real repositories.
+     * write ({@code tags: postgres, indexing}), because both are common in real repositories. Only
+     * for list keys: scalar keys use {@link #first}, which keeps commas.
      */
     public List<String> all(String key) {
         List<String> raw = lookup(key);

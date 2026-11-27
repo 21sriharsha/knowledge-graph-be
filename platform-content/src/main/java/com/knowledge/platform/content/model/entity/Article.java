@@ -168,6 +168,26 @@ public class Article {
         return true;
     }
 
+    /**
+     * Re-applies the title and summary derived from unchanged source bytes.
+     *
+     * <p>Used when the content hash matches (so {@link #applyRevision} changes nothing) but the
+     * platform's parsing now yields different values -- e.g. after the front-matter comma fix. Neither
+     * the revision number nor the content hash moves: the source did not change, only what we derive
+     * from it.
+     *
+     * @return whether anything changed
+     */
+    public boolean refreshDerivedMetadata(String title, String summary) {
+        Objects.requireNonNull(title, "title");
+        if (this.title.equals(title) && Objects.equals(this.summary, summary)) {
+            return false;
+        }
+        this.title = title;
+        this.summary = summary;
+        return true;
+    }
+
     /** Records where this article came from, so re-ingestion can find it by coordinate. */
     public void bindToSource(UUID repositoryId, String sourcePath) {
         this.repositoryId = repositoryId;

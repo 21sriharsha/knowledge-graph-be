@@ -48,15 +48,17 @@ public class ArticleDelegate {
     public PageResponse<ArticleResponse> listVisible(Pageable pageable) {
         StudioPrincipal principal = principals.require();
 
+        // Editorial queries, not the reader's findPublished*: drafts and archived articles must stay
+        // reachable here, or unpublishing could only be undone by someone who remembers the slug.
         if (principal.isAdmin()) {
-            return PageResponse.from(articleService.findPublished(pageable), ArticleResponse::from);
+            return PageResponse.from(articleService.findEditable(pageable), ArticleResponse::from);
         }
         if (principal.authorId() == null) {
             // Signed in, no byline: nothing is theirs to edit.
             return PageResponse.from(Page.<Article>empty(pageable), ArticleResponse::from);
         }
         return PageResponse.from(
-                articleService.findPublishedByAuthor(principal.authorId(), pageable),
+                articleService.findEditableByAuthor(principal.authorId(), pageable),
                 ArticleResponse::from);
     }
 
