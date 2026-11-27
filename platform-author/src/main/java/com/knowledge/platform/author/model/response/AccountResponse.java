@@ -45,9 +45,22 @@ public record AccountResponse(
      * I do things here, and whose work is mine. A new account can reach this while it can reach
      * nothing else, which is the point -- somebody who has just signed up needs to be told why the
      * studio is empty, not left to guess.
+     *
+     * @param effectiveRoles what this request is authorized with: stored grants plus token-granted
+     *     roles. The administrator's list ({@link #from(Account)}) shows stored grants only, because
+     *     token roles exist per request rather than per account.
      */
-    public static AccountResponse selfFor(Account account) {
-        return from(account);
+    public static AccountResponse selfFor(Account account, Set<PlatformRole> effectiveRoles) {
+        return new AccountResponse(
+                account.getId(),
+                account.getIssuer(),
+                account.getSubject(),
+                account.getEmail(),
+                account.getDisplayName(),
+                effectiveRoles,
+                account.getAuthorId(),
+                account.getCreatedAt(),
+                account.getLastSeenAt());
     }
 
     public static List<AccountResponse> from(List<Account> accounts) {

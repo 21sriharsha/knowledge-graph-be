@@ -49,6 +49,20 @@ public interface AuthorService {
      */
     Author findOrCreateByName(String displayName, String email);
 
+    /**
+     * Updates a byline's profile and announces it, so every page embedding the name follows.
+     */
     Author updateProfile(
             Slug slug, String displayName, String biography, String avatarUrl, String email);
+
+    /**
+     * Creates a new byline for a person who signed in, never reusing an existing one.
+     *
+     * <p>Unlike {@link #findOrCreateByName}, this never matches an existing author by name or
+     * email, and the created author carries no email. Matching would let a sign-in claim a byline
+     * that an unverified Markdown file created; an email on the row would let a front-matter
+     * {@code author_email} attach articles to this person. When the name's slug is taken, a numeric
+     * suffix keeps it unique ({@code jane-doe-2}).
+     */
+    Author createPersonal(String displayName);
 }

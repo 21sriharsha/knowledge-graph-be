@@ -46,4 +46,23 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             @Param("subject") String subject,
             @Param("email") String email,
             @Param("displayName") String displayName);
+
+    /**
+     * Links a byline only if the account has none yet.
+     *
+     * <p>Conditional in the database for the same reason as {@link #insertIfAbsent}: a page makes
+     * several backend calls at once, and each may try to give a new author their personal byline.
+     * Under READ COMMITTED a second update waits for the first and then re-evaluates the condition,
+     * so exactly one link wins. Flushes first so the new author row exists for the foreign key, and
+     * clears the persistence context so the caller re-reads the account rather than a stale copy.
+     *
+     * @return 1 if this call linked the byline, 0 if the account already had one
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            update author.accounts
+               set author_id = :authorId, updated_at = now()
+             where id = :accountId and author_id is null
+            """, nativeQuery = true)
+    int linkAuthorIfUnlinked(@Param("accountId") UUID accountId, @Param("authorId") UUID authorId);
 }

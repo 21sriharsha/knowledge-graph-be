@@ -29,7 +29,9 @@ public class AccountDelegate {
             return new AccountResponse(
                     null, null, null, null, null, principal.roles(), null, null, null);
         }
-        return AccountResponse.selfFor(accountService.requireById(principal.accountId()));
+        // Effective roles, not only stored grants: the studio decides what to show from this, and
+        // a token-granted AUTHOR is as real for this request as a stored one.
+        return AccountResponse.selfFor(accountService.requireById(principal.accountId()), principal.roles());
     }
 
     public List<AccountResponse> accounts() {
