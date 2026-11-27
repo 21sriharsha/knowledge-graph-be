@@ -39,7 +39,11 @@ public class SearchController {
                     """)
     public SearchResponse search(
             @RequestParam String q,
+            @Parameter(description = "Zero-based page number")
             @RequestParam(defaultValue = "0") @Min(0) int page,
+            @Parameter(description = "Results per page. Omit or send 0 for the server default "
+                    + "(knowledge.search.default-page-size, 20); values above "
+                    + "knowledge.search.max-page-size (50) are capped")
             @RequestParam(defaultValue = "0") int size,
             @Parameter(description = "Force query understanding on or off; omit to let the analyzer decide")
             @RequestParam(required = false) Boolean understand) {

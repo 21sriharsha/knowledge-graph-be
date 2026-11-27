@@ -20,6 +20,7 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class DefaultArticleServiceImpl implements ArticleService {
 
     /** Bounds the "related articles" query; the read model shows a handful, never a corpus. */
     private static final int RELATED_ARTICLE_LIMIT = 6;
+    private static final Sort EDITORIAL_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "updatedAt");
 
     private final ArticleRepository articleRepository;
     private final ArticleRevisionRepository revisionRepository;
@@ -110,6 +112,24 @@ public class DefaultArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    public Page<Article> findEditable(Pageable pageable) {
+        return articleRepository.findAllBy(withEditorialDefaultSort(pageable));
+    }
+
+    @Override
+    public Page<Article> findEditableByAuthor(UUID authorId, Pageable pageable) {
+        return articleRepository.findByAuthorId(authorId, withEditorialDefaultSort(pageable));
+    }
+
+    /** Most recently updated first, unless the caller asked for a specific order. */
+    private static Pageable withEditorialDefaultSort(Pageable pageable) {
+        if (pageable.isUnpaged() || pageable.getSort().isSorted()) {
+            return pageable;
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), EDITORIAL_DEFAULT_SORT);
+    }
+
+    @Override
     public Page<Article> findPublishedByTag(Slug tagSlug, Pageable pageable) {
         return articleRepository.findByTagSlug(tagSlug.value(), PublicationState.PUBLISHED, pageable);
     }
@@ -165,6 +185,17 @@ public class DefaultArticleServiceImpl implements ArticleService {
                 command.readingTimeMinutes());
 
         if (!changed) {
+            if (article.refreshDerivedMetadata(command.title(), command.summary())) {
+                // Same source bytes, different derived values: a parsing fix must still reach readers.
+                // Taxonomy is re-applied like on any rematerialization (idempotent for unchanged
+                // front matter); downstream handlers read tags/topics after this transaction ends, so
+                // they must be loaded here. Publication state is deliberately left alone: the source
+                // didn't change, so an editor's manual unpublish must survive a resync.
+                applyTaxonomy(article, command);
+                log.info("Article {} re-derived at unchanged hash {}; title/summary corrected, rematerializing",
+                        article.getSlug(), command.contentHash());
+                return new ArticleUpsertResult(articleRepository.save(article), false, false, true);
+            }
             log.debug("Article {} unchanged at hash {}; skipping rematerialization",
                     article.getSlug(), command.contentHash());
             return new ArticleUpsertResult(articleRepository.save(article), false, false);

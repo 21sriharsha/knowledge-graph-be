@@ -31,7 +31,7 @@ public class ArticleController {
     }
 
     @GetMapping
-    @Operation(summary = "Published articles this account may edit")
+    @Operation(summary = "Articles this account may edit, in any publication state (most recently updated first unless sorted)")
     public PageResponse<ArticleResponse> list(Pageable pageable) {
         return articleDelegate.listVisible(pageable);
     }

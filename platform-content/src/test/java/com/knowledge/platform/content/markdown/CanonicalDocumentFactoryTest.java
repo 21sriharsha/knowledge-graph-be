@@ -143,6 +143,25 @@ class CanonicalDocumentFactoryTest {
         }
 
         @Test
+        @DisplayName("AC-5 commas in scalar front matter survive; list keys still split")
+        void keepsCommasInTitleAndSummary() {
+            CanonicalDocument document = factory.create("""
+                    ---
+                    title: Raft, explained
+                    summary: Combining lexical and semantic retrieval, and why the scores must be normalized.
+                    tags: search, postgres
+                    ---
+
+                    Body text.
+                    """);
+
+            assertThat(document.title()).isEqualTo("Raft, explained");
+            assertThat(document.summary())
+                    .isEqualTo("Combining lexical and semantic retrieval, and why the scores must be normalized.");
+            assertThat(document.frontmatter().all("tags")).containsExactly("search", "postgres");
+        }
+
+        @Test
         void fallsBackToFirstHeadingWhenFrontmatterHasNoTitle() {
             CanonicalDocument document = factory.create("# Heading Title\n\nBody text.");
 

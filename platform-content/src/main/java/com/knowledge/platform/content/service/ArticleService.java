@@ -53,6 +53,18 @@ public interface ArticleService {
 
     Page<Article> findPublishedByTag(Slug tagSlug, Pageable pageable);
 
+    /**
+     * Every article, in any publication state -- the editorial list for administrators.
+     *
+     * <p>Distinct from {@link #findPublished}: the studio must show drafts and archived articles,
+     * or unpublishing becomes a one-way door. Without a caller-supplied sort the most recently
+     * updated come first, because drafts have no publication date to order by.
+     */
+    Page<Article> findEditable(Pageable pageable);
+
+    /** One byline's articles, in any publication state -- an author's editorial list. */
+    Page<Article> findEditableByAuthor(UUID authorId, Pageable pageable);
+
     Page<Article> findPublishedByTopic(Slug topicSlug, Pageable pageable);
 
     List<Article> findRelated(UUID articleId);

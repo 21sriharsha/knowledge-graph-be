@@ -129,6 +129,20 @@ class ArticleTest {
         assertThat(article.hashCode()).isEqualTo(before);
     }
 
+    @Test
+    @DisplayName("re-deriving a corrected summary at the same hash changes values, not the revision")
+    void refreshesDerivedMetadataWithoutNewRevision() {
+        Article article = newArticle();
+
+        boolean refreshed = article.refreshDerivedMetadata("Kubernetes Networking", "How pods get addresses, and why.");
+
+        assertThat(refreshed).isTrue();
+        assertThat(article.getSummary()).isEqualTo("How pods get addresses, and why.");
+        assertThat(article.getRevisionNumber()).isEqualTo(1);
+        assertThat(article.refreshDerivedMetadata("Kubernetes Networking", "How pods get addresses, and why."))
+                .as("identical values are not a change").isFalse();
+    }
+
     private Article newArticle() {
         return Article.create("kubernetes-networking", "Kubernetes Networking",
                 "How pods get addresses.", "# Kubernetes Networking\n\nBody.", "hash-1",
