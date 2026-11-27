@@ -23,11 +23,14 @@ import java.util.UUID;
  * <p>Distinct from {@link Author}, and the distinction is the point. An author is a byline, created
  * implicitly during ingestion from whatever a Markdown file claimed, and belonging to people who may
  * never visit the site. An account is a person who proved control of an identity at an OIDC
- * provider. Linking the two is an administrative act, because an unverified name in a committed file
- * must never be able to claim a sign-in identity.
+ * provider. An account is linked either to its own newly created byline or, by an administrator, to
+ * an existing one -- never by matching names or emails, because an unverified name in a committed
+ * file must never be able to claim a sign-in identity.
  *
- * <p>An account with no roles is the normal initial state: it can sign in and do nothing at all.
- * That is deliberate -- a new sign-in should grant nothing until someone decides otherwise.
+ * <p>A new account has no stored roles and no byline. Stored roles are the platform's own grants
+ * (the only source of ADMIN); a request may additionally carry AUTHOR from a provider-written token
+ * claim, and the first such request gives the account a personal byline. See
+ * {@code .claude/specs/self-serve-authoring.md}.
  */
 @Entity
 @Table(name = "accounts", schema = "author")

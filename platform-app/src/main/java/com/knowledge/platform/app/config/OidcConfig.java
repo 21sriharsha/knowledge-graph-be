@@ -1,5 +1,8 @@
 package com.knowledge.platform.app.config;
 
+import com.knowledge.platform.author.model.entity.PlatformRole;
+import java.util.Set;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -38,9 +41,34 @@ public class OidcConfig {
      * @param jwkSetUri overrides discovery. Needed for providers whose JWKS is not where the
      *     discovery document says, or when discovery is unreachable at startup.
      * @param audience the expected {@code aud}. Optional, and checked only when set.
+     * @param rolesClaim the token claim holding platform roles, written by the provider's
+     *     access-token hook (Supabase: a Custom Access Token hook). Defaults to {@code app_roles}.
+     *     Users cannot set it, unlike {@code user_metadata}, which is never read for roles.
+     * @param tokenGrantableRoles the only roles a token may grant. Defaults to AUTHOR. ADMIN is
+     *     refused at startup: administrators come from this platform's records only, so a mistake in
+     *     the provider's hook -- or a compromised provider dashboard -- cannot mint them.
      */
     @ConfigurationProperties(prefix = "knowledge.security.oidc")
-    public record OidcProperties(String issuerUri, String jwkSetUri, String audience) {
+    public record OidcProperties(
+            String issuerUri,
+            String jwkSetUri,
+            String audience,
+            String rolesClaim,
+            Set<PlatformRole> tokenGrantableRoles) {
+
+        static final String DEFAULT_ROLES_CLAIM = "app_roles";
+
+        public OidcProperties {
+            rolesClaim = StringUtils.hasText(rolesClaim) ? rolesClaim.trim() : DEFAULT_ROLES_CLAIM;
+            tokenGrantableRoles = tokenGrantableRoles == null
+                    ? Set.of(PlatformRole.AUTHOR)
+                    : Set.copyOf(tokenGrantableRoles);
+            if (tokenGrantableRoles.contains(PlatformRole.ADMIN)) {
+                throw new IllegalArgumentException(
+                        "knowledge.security.oidc.token-grantable-roles must not contain ADMIN: "
+                                + "administrators are granted only by this platform, never by a token");
+            }
+        }
     }
 
     @Bean

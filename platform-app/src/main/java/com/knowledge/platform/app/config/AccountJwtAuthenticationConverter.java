@@ -1,9 +1,12 @@
 package com.knowledge.platform.app.config;
 
 import com.knowledge.platform.author.model.entity.Account;
+import com.knowledge.platform.author.model.entity.PlatformRole;
 import com.knowledge.platform.author.service.AccountService;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -16,17 +19,24 @@ import org.springframework.stereotype.Component;
 /**
  * Turns a validated access token into this platform's authorities.
  *
- * <p>The whole point of this class is what it <em>does not</em> read. Supabase issues a {@code role}
- * claim, and it is {@code "authenticated"} for every signed-in user -- it names a Postgres role in
- * the provider's own database, not a permission here. The token also carries user metadata that the
- * user it describes can edit. Deriving authorities from either would mean anyone could grant
- * themselves anything.
+ * <p>Much of the point of this class is what it <em>does not</em> read. Supabase issues a
+ * {@code role} claim, and it is {@code "authenticated"} for every signed-in user -- it names a
+ * Postgres role in the provider's own database, not a permission here. The token also carries user
+ * metadata that the user it describes can edit. Neither ever grants anything.
  *
- * <p>So the token is used for exactly one thing: establishing that the caller controls a subject at
- * a trusted issuer. What that subject may do is looked up here, from this platform's records.
+ * <p>Authorities are the union of two sources:
+ * <ul>
+ *   <li>this platform's records -- the only source of ADMIN (bootstrap address, studio grants);
+ *   <li>the provider-written roles claim, limited to token-grantable roles (AUTHOR by default). Every
+ *       signed-in user gets AUTHOR this way when the provider's access-token hook is enabled, so the
+ *       default is controlled at the provider and existing accounts pick it up on their next token.
+ * </ul>
+ * See {@link TokenRoleExtractor} and {@code .claude/specs/self-serve-authoring.md}. Token roles are
+ * not stored: they are re-read on every request, so withdrawing them at the provider takes effect as
+ * the current token expires.
  *
- * <p>A first sign-in creates an account with no roles and is authenticated with no authorities --
- * able to prove who it is and to do nothing at all, until an administrator decides otherwise.
+ * <p>An author needs a byline to own anything, so the first request that carries AUTHOR for an
+ * account without one gets a personal byline created and linked.
  */
 @Slf4j
 @Component
@@ -37,9 +47,11 @@ public class AccountJwtAuthenticationConverter
     private static final String ROLE_PREFIX = "ROLE_";
 
     private final AccountService accountService;
+    private final TokenRoleExtractor tokenRoles;
 
-    public AccountJwtAuthenticationConverter(AccountService accountService) {
+    public AccountJwtAuthenticationConverter(AccountService accountService, TokenRoleExtractor tokenRoles) {
         this.accountService = accountService;
+        this.tokenRoles = tokenRoles;
     }
 
     @Override
@@ -50,7 +62,15 @@ public class AccountJwtAuthenticationConverter
                 jwt.getClaimAsString("email"),
                 displayNameOf(jwt));
 
-        Collection<GrantedAuthority> authorities = account.getRoles().stream()
+        Set<PlatformRole> roles = EnumSet.noneOf(PlatformRole.class);
+        roles.addAll(account.getRoles());
+        roles.addAll(tokenRoles.rolesFrom(jwt));
+
+        if (roles.contains(PlatformRole.AUTHOR) && account.getAuthorId() == null) {
+            account = accountService.ensurePersonalAuthor(account.getId());
+        }
+
+        Collection<GrantedAuthority> authorities = roles.stream()
                 .map(role -> (GrantedAuthority) new SimpleGrantedAuthority(ROLE_PREFIX + role.name()))
                 .toList();
 

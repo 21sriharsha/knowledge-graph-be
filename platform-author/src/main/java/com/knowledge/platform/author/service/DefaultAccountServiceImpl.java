@@ -1,6 +1,7 @@
 package com.knowledge.platform.author.service;
 
 import com.knowledge.platform.author.model.entity.Account;
+import com.knowledge.platform.author.model.entity.Author;
 import com.knowledge.platform.author.model.entity.PlatformRole;
 import com.knowledge.platform.author.repository.AccountRepository;
 import com.knowledge.platform.author.repository.AuthorRepository;
@@ -22,16 +23,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DefaultAccountServiceImpl implements AccountService {
 
+    /** Byline name when the account has neither a display name nor a usable email. */
+    private static final String FALLBACK_BYLINE_NAME = "Author";
+
     private final AccountRepository accounts;
     private final AuthorRepository authors;
+    private final AuthorService authorService;
     private final Set<String> bootstrapAdminEmails;
 
     public DefaultAccountServiceImpl(
             AccountRepository accounts,
             AuthorRepository authors,
+            AuthorService authorService,
             AccountSecurityProperties properties) {
         this.accounts = accounts;
         this.authors = authors;
+        this.authorService = authorService;
         this.bootstrapAdminEmails = properties.normalisedBootstrapAdminEmails();
     }
 
@@ -59,7 +66,7 @@ public class DefaultAccountServiceImpl implements AccountService {
         int inserted = accounts.insertIfAbsent(
                 UUID.randomUUID(), issuer, subject, email, displayName);
         if (inserted > 0) {
-            log.info("First sign-in for subject {} at {}; created an account with no roles",
+            log.info("First sign-in for subject {} at {}; created an account with no stored roles",
                     subject, issuer);
         } else {
             log.debug("Concurrent first sign-in for subject {}; using the account that won", subject);
@@ -89,6 +96,34 @@ public class DefaultAccountServiceImpl implements AccountService {
                     + "Clear that property once an administrator exists.", account.getEmail());
             account.grant(PlatformRole.ADMIN);
         }
+    }
+
+    @Override
+    @Transactional
+    public Account ensurePersonalAuthor(UUID accountId) {
+        Account account = requireById(accountId);
+        if (account.getAuthorId() != null) {
+            return account;
+        }
+        Author byline = authorService.createPersonal(bylineNameFor(account));
+        if (accounts.linkAuthorIfUnlinked(accountId, byline.getId()) == 0) {
+            // Another request linked a byline first; ours would be an orphan nobody owns.
+            authors.deleteById(byline.getId());
+            log.debug("Account {} got its byline from a concurrent request; discarded {}",
+                    accountId, byline.getSlug());
+        } else {
+            log.info("Created personal byline '{}' for account {}", byline.getSlug(), accountId);
+        }
+        return requireById(accountId);
+    }
+
+    private static String bylineNameFor(Account account) {
+        if (account.getDisplayName() != null && !account.getDisplayName().isBlank()) {
+            return account.getDisplayName();
+        }
+        String email = account.getEmail();
+        int at = email == null ? -1 : email.indexOf('@');
+        return at > 0 ? email.substring(0, at) : FALLBACK_BYLINE_NAME;
     }
 
     @Override
